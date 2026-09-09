@@ -3,7 +3,1030 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Анонимизатор Pro v5.0 — улучшенная версия</title>
+<title>Анонимизатор Pro v7.3 — Морфология + Грамматика + Словари</title>
+<script>
+// ============================================
+// MORPH-ENGINE.JS — Морфологический движок русского языка
+// Версия 1.0 — оптимизирован для анонимизации
+// ============================================
+
+const MorphEngine = (function() {
+  'use strict';
+
+  // ============ ТАБЛИЦЫ ОКОНЧАНИЙ ============
+
+  // Фамилии мужские (типичные окончания)
+  const SURNAME_M = {
+    nominative:   ['ов','ев','ин','ын','ский','цкий','ой','ий','ых','их','ец','ь','ко','ло','но','во','со','ёв','ов','ев','ин','ын','ский','цкий','ой','ий','ев','ов','ин','ын','ский','цкий','ой','ий','ан','ян','он','аш','еш','иш','ыш'],
+    genitive:     ['ова','ева','ина','ына','ского','цкого','ого','его','ых','их','ца','я','ка','ла','на','ва','са','ёва','ова','ева','ина','ына','ского','цкого','ого','его','ана','яна','она','аша','еша','иша','ыша'],
+    dative:       ['ову','еву','ину','ыну','скому','цкому','ому','ему','ым','им','цу','ю','ку','лу','ну','ву','су','ёву','ову','еву','ину','ыну','скому','цкому','ому','ему','ану','яну','ону','ашу','ешу','ишу','ышу'],
+    accusative:   ['ова','ева','ина','ына','ского','цкого','ого','его','ых','их','ца','а','ка','ла','на','ва','са','ёва','ова','ева','ина','ына','ского','цкого','ого','его','ана','яна','она','аша','еша','иша','ыша'],
+    instrumental: ['овым','евым','иным','ынм','ским','цким','ым','им','цем','ем','ком','лом','ном','вом','сом','ёвым','овым','евым','иным','ынм','ским','цким','ым','им','аном','яном','оном','ашем','ешем','ишем','ышем'],
+    prepositional:['ове','еве','ине','ыне','ском','цком','ом','ем','це','е','ке','ле','не','ве','се','ёве','ове','еве','ине','ыне','ском','цком','ом','ем','ане','яне','оне','аше','еше','ише','ыше']
+  };
+
+  // Фамилии женские
+  const SURNAME_F = {
+    nominative:   ['ова','ева','ина','ына','ская','цкая','ая','яя','ых','их','ко','ло','но','во','со','ёва','ова','ева','ина','ына','ская','цкая','ая','яя','ана','яна','она'],
+    genitive:     ['овой','евой','иной','ыной','ской','цкой','ой','ей','ых','их','ки','лы','ны','вы','сы','ёвой','овой','евой','иной','ыной','ской','цкой','ой','ей','аной','яной','оной'],
+    dative:       ['овой','евой','иной','ыной','ской','цкой','ой','ей','ым','им','ке','ле','не','ве','се','ёвой','овой','евой','иной','ыной','ской','цкой','ой','ей','аной','яной','оной'],
+    accusative:   ['ову','еву','ину','ыну','скую','цкую','ую','юю','ых','их','ку','лу','ну','ву','су','ёву','ову','еву','ину','ыну','скую','цкую','ую','юю','ану','яну','ону'],
+    instrumental: ['овой','евой','иной','ыной','ской','цкой','ой','ей','ыми','ими','кой','лой','ной','вой','сой','ёвой','овой','евой','иной','ыной','ской','цкой','ой','ей','аной','яной','оной'],
+    prepositional:['овой','евой','иной','ыной','ской','цкой','ой','ей','ых','их','ке','ле','не','ве','се','ёвой','овой','евой','иной','ыной','ской','цкой','ой','ей','аной','яной','оной']
+  };
+
+  // Имена мужские
+  const NAME_M = {
+    nominative:   ['а','й','ь','я','н','р','л','с','м','к','т','в','д','г','з','б','п','х','ч','ш','щ','ж','ц','ю','у','о','е','и'],
+    genitive:     ['ы','я','я','и','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','и'],
+    dative:       ['е','ю','ю','е','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','и'],
+    accusative:   ['у','я','я','ю','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','а','ю'],
+    instrumental: ['ой','ем','ем','ей','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ом','ей'],
+    prepositional:['е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','и']
+  };
+
+  // Имена женские
+  const NAME_F = {
+    nominative:   ['а','я','ь','я','н','р','л','с','м','к','т','в','д','г','з','б','п','х','ч','ш','щ','ж','ц','ю','у','о','е','и'],
+    genitive:     ['ы','и','и','и','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','ы','и'],
+    dative:       ['е','е','и','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','и'],
+    accusative:   ['у','ю','ь','ю','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','у','ю'],
+    instrumental: ['ой','ей','ью','ей','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ой','ей'],
+    prepositional:['е','е','и','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','е','и']
+  };
+
+  // Отчества
+  const PATR_M = ['ович','евич','ич','ьич','улы','кызы','ович','евич','ьевич','иевич','еевич'];
+  const PATR_F = ['овна','евна','ична','ьевна','иевна','еевна'];
+
+  // Города (типичные окончания)
+  const CITY_ENDINGS = ['ск','цк','град','поль','бург','виль','дам','сток',' Gora','гор','пет','кам','ног','вич','вск','мир','йск','гск','тск','рск','пск','мск'];
+
+  // Улицы (типичные окончания прилагательных)
+  const STREET_ENDINGS = ['ская','ский','шая','ная','ный','чная','щая','жная','жный','зкая','зкий','цкая','цкий','ская','ский','линия','площадь','бульвар','переулок','тупик','проезд','набережная','шоссе','аллея','проспект','тракт','дорога'];
+
+  // Предлоги с управлением
+  const PREP_GOVERNMENT = {
+    'в': ['accusative','prepositional'],
+    'во': ['accusative','prepositional'],
+    'на': ['accusative','prepositional'],
+    'под': ['accusative','instrumental'],
+    'за': ['accusative','instrumental'],
+    'по': ['dative'],
+    'к': ['dative'],
+    'ко': ['dative'],
+    'от': ['genitive'],
+    'до': ['genitive'],
+    'без': ['genitive'],
+    'безо': ['genitive'],
+    'для': ['genitive'],
+    'ради': ['genitive'],
+    'из': ['genitive'],
+    'изо': ['genitive'],
+    'с': ['genitive','instrumental'],
+    'со': ['genitive','instrumental'],
+    'у': ['genitive'],
+    'о': ['prepositional'],
+    'об': ['prepositional'],
+    'обо': ['prepositional'],
+    'при': ['prepositional'],
+    'про': ['accusative'],
+    'через': ['accusative'],
+    'сквозь': ['accusative'],
+    'вдоль': ['genitive'],
+    'по': ['dative','accusative'],
+    'вплоть': ['genitive'],
+    'включая': ['accusative'],
+    'исключая': ['accusative'],
+    'спустя': ['accusative'],
+    'вследствие': ['genitive'],
+    'благодаря': ['dative'],
+    'вопреки': ['dative'],
+    'навстречу': ['dative'],
+    'согласно': ['dative'],
+    'вопреки': ['dative'],
+    'ввиду': ['genitive'],
+    'вслед': ['dative'],
+    'наперекор': ['dative'],
+    'подобно': ['dative'],
+    'вплотьдо': ['genitive'],
+    'посредством': ['genitive'],
+    'путём': ['genitive'],
+    'вместо': ['genitive'],
+    'вроде': ['genitive'],
+    'наподобие': ['genitive'],
+    'вследствие': ['genitive'],
+    'по причине': ['genitive'],
+    'в силу': ['genitive'],
+    'в течение': ['genitive'],
+    'в продолжение': ['genitive'],
+    'в заключение': ['genitive'],
+    'в результате': ['genitive'],
+    'в целях': ['genitive'],
+    'в порядке': ['genitive'],
+    'в связи с': ['instrumental'],
+    'в соответствии с': ['instrumental'],
+    'в отличие от': ['genitive'],
+    'в зависимости от': ['genitive'],
+    'в пользу': ['genitive'],
+    'в отношении': ['genitive'],
+    'в ответ на': ['accusative'],
+    'в направлении': ['genitive'],
+    'в районе': ['genitive'],
+    'в области': ['genitive'],
+    'в сфере': ['genitive'],
+    'в части': ['genitive'],
+    'в составе': ['genitive'],
+    'в качестве': ['genitive'],
+    'в лице': ['genitive'],
+    'в отсутствие': ['genitive'],
+    'в присутствии': ['genitive'],
+    'в распоряжении': ['genitive'],
+    'в пользу': ['genitive'],
+    'в удовлетворение': ['genitive'],
+    'в обеспечение': ['genitive'],
+    'в счёт': ['genitive'],
+    'в размере': ['genitive'],
+    'в пределах': ['genitive'],
+    'в целях': ['genitive'],
+    'в порядке': ['genitive'],
+    'в случае': ['genitive'],
+    'в целях': ['genitive'],
+    'в целях': ['genitive'],
+    'в целях': ['genitive']
+  };
+
+  // Маркеры, после которых идёт ФИО
+  const FIO_MARKERS = [
+    'гражданин','гражданка','гр-н','гр-ка','господин','госпожа','г-н','г-жа',
+    'товарищ','тов','доктор','др','профессор','проф','инженер','директор',
+    'начальник','заместитель','председатель','секретарь','консультант',
+    'агент','представитель','уполномоченный','управляющий','ректор','декан',
+    'заведующий','руководитель','исполнитель','заказчик','поставщик',
+    'покупатель','продавец','клиент','партнёр','контрагент','арендатор',
+    'наниматель','собственник','владелец','наследник','опекун','попечитель',
+    'доверенное лицо','представитель по доверенности','уполномоченный представитель',
+    'истец','ответчик','заявитель','жалобщик','взыскатель','должник','кредитор',
+    'работодатель','работник','сотрудник','служащий','генеральный директор','инвалид',
+    'пенсионер','ветеран','участник','ребёнок','несовершеннолетний','потерпевший',
+    'обвиняемый','осуждённый','заключённый','пациент','больной',
+    'уважаемый','уважаемая','дорогой','дорогая',
+    'ип','индивидуальный предприниматель','предприниматель',
+    'гражданки','гражданина','инвалида','проживающей','зарегистрированной',
+    'гр-ки','г-жи','госпожи','ответчика','истца','заявителя','взыскателя',
+    'должника','кредитора','представителя','уполномоченного','доверенного',
+    'опекуна','попечителя','наследника','собственника','владельца',
+    'арендатора','нанимателя','работника','сотрудника','руководителя',
+    'директора','начальника','председателя','секретаря','консультанта',
+    'агента','поставщика','покупателя','продавца','клиента','партнёра',
+    'контрагента','врача','хирурга','терапевта','юриста','адвоката',
+    'судью','прокурора','следователя','эксперта','переводчика','нотариуса',
+    'арбитра','посредника','ип','индивидуальному','индивидуальному',
+    'предпринимателю','предпринимателя'
+  ];
+
+  // ============ ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ============
+
+  function byLenDesc(arr) {
+    return arr.slice().sort(function(a, b) { return b.length - a.length; });
+  }
+
+  function endsWithAny(word, endings) {
+    const w = word.toLowerCase();
+    for (let i = 0; i < endings.length; i++) {
+      if (w.endsWith(endings[i].toLowerCase())) {
+        return endings[i];
+      }
+    }
+    return null;
+  }
+
+  function startsWithUpper(word) {
+    return /^[А-ЯЁ]/.test(word);
+  }
+
+  function isSentenceStart(context) {
+    return context && context.isSentenceStart === true;
+  }
+
+  // ============ ОСНОВНЫЕ ФУНКЦИИ ============
+
+  /**
+   * Определяет падеж и тип слова по окончанию
+   */
+  function detectCase(word) {
+    const w = word.toLowerCase();
+    const cases = ['genitive','dative','accusative','instrumental','prepositional','nominative'];
+
+    // Проверяем отчества первыми (самые специфичные)
+    for (const pat of PATR_M) {
+      if (w.endsWith(pat.toLowerCase())) {
+        return { type: 'patronymic', gender: 'm', case: 'nominative', ending: pat, base: w.slice(0, -pat.length) };
+      }
+    }
+    for (const pat of PATR_F) {
+      if (w.endsWith(pat.toLowerCase())) {
+        return { type: 'patronymic', gender: 'f', case: 'nominative', ending: pat, base: w.slice(0, -pat.length) };
+      }
+    }
+
+    // Проверяем фамилии (мужские)
+    for (const caseName of cases) {
+      const endings = byLenDesc(SURNAME_M[caseName]);
+      for (const ending of endings) {
+        if (w.endsWith(ending.toLowerCase())) {
+          return { type: 'surname', gender: 'm', case: caseName, ending, base: w.slice(0, -ending.length) };
+        }
+      }
+    }
+
+    // Проверяем фамилии (женские)
+    for (const caseName of cases) {
+      const endings = byLenDesc(SURNAME_F[caseName]);
+      for (const ending of endings) {
+        if (w.endsWith(ending.toLowerCase())) {
+          return { type: 'surname', gender: 'f', case: caseName, ending, base: w.slice(0, -ending.length) };
+        }
+      }
+    }
+
+    // Проверяем имена (мужские)
+    for (const caseName of cases) {
+      const endings = byLenDesc(NAME_M[caseName]);
+      for (const ending of endings) {
+        if (w.endsWith(ending.toLowerCase())) {
+          return { type: 'name', gender: 'm', case: caseName, ending, base: w.slice(0, -ending.length) };
+        }
+      }
+    }
+
+    // Проверяем имена (женские)
+    for (const caseName of cases) {
+      const endings = byLenDesc(NAME_F[caseName]);
+      for (const ending of endings) {
+        if (w.endsWith(ending.toLowerCase())) {
+          return { type: 'name', gender: 'f', case: caseName, ending, base: w.slice(0, -ending.length) };
+        }
+      }
+    }
+
+    // Проверяем на город
+    for (const end of CITY_ENDINGS) {
+      if (w.endsWith(end.toLowerCase())) {
+        return { type: 'city', gender: null, case: 'nominative', ending: end, base: w.slice(0, -end.length) };
+      }
+    }
+
+    // Проверяем на улицу
+    for (const end of STREET_ENDINGS) {
+      if (w.endsWith(end.toLowerCase())) {
+        return { type: 'street', gender: null, case: 'nominative', ending: end, base: w.slice(0, -end.length) };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Приводит слово к именительному падежу (начальной форме)
+   */
+  function lemmatize(word, morphInfo) {
+    if (!morphInfo) morphInfo = detectCase(word);
+    if (!morphInfo) return word;
+
+    let base = morphInfo.base || word.toLowerCase();
+
+    // Для фамилий добавляем именительное окончание
+    if (morphInfo.type === 'surname') {
+      const nomEndings = morphInfo.gender === 'f' ? SURNAME_F.nominative : SURNAME_M.nominative;
+      // Берём самое частое окончание
+      const defaultEnding = morphInfo.gender === 'f' ? 'ова' : 'ов';
+      return (base + defaultEnding).charAt(0).toUpperCase() + (base + defaultEnding).slice(1);
+    }
+
+    // Для имён
+    if (morphInfo.type === 'name') {
+      // Для мужских имён часто номинатив без окончания или с -а
+      if (morphInfo.gender === 'm') {
+        // Если база заканчивается на согласную, это может быть номинатив
+        if (/[бвгджзйклмнпрстфхцчшщ]$/.test(base)) {
+          return base.charAt(0).toUpperCase() + base.slice(1);
+        }
+        return (base + 'а').charAt(0).toUpperCase() + (base + 'а').slice(1);
+      }
+      // Для женских
+      return (base + 'а').charAt(0).toUpperCase() + (base + 'а').slice(1);
+    }
+
+    // Для отчеств
+    if (morphInfo.type === 'patronymic') {
+      const defaultPatr = morphInfo.gender === 'm' ? 'ович' : 'овна';
+      return (base + defaultPatr).charAt(0).toUpperCase() + (base + defaultPatr).slice(1);
+    }
+
+    return word;
+  }
+
+  /**
+   * Определяет, является ли слово именем собственным (ФИО, город, улица)
+   */
+  function isProperNoun(word, context) {
+    if (!word || word.length < 2) return { isProper: false, confidence: 0 };
+
+    // Не начинается с заглавной — точно не имя собственное (кроме начала предложения)
+    if (!startsWithUpper(word)) {
+      return { isProper: false, confidence: 0 };
+    }
+
+    const morph = detectCase(word);
+
+    // Если это начало предложения, проверяем контекст
+    if (isSentenceStart(context)) {
+      // Если следующее слово тоже с заглавной — скорее всего имя собственное
+      if (context.nextWord && startsWithUpper(context.nextWord) && context.nextWord.length > 1) {
+        // Проверяем, не является ли следующее слово обычным (начало нового предложения в цитате)
+        const nextMorph = detectCase(context.nextWord);
+        if (nextMorph && (nextMorph.type === 'surname' || nextMorph.type === 'name' || nextMorph.type === 'patronymic')) {
+          return { isProper: true, confidence: 0.9, reason: 'два заглавных подряд в начале', morph: nextMorph };
+        }
+      }
+      // Если есть маркер перед словом (в предыдущем контексте)
+      if (context.prevWord) {
+        const prevLower = context.prevWord.toLowerCase();
+        if (FIO_MARKERS.some(m => prevLower.includes(m.toLowerCase()))) {
+          return { isProper: true, confidence: 0.95, reason: 'после маркера ФИО', morph };
+        }
+      }
+      return { isProper: false, confidence: 0.3, reason: 'начало предложения' };
+    }
+
+    // Если морфологический анализ определил тип
+    if (morph) {
+      const confidence = morph.type === 'patronymic' ? 0.95 :
+                        morph.type === 'surname' ? 0.85 :
+                        morph.type === 'name' ? 0.8 :
+                        morph.type === 'city' ? 0.7 :
+                        morph.type === 'street' ? 0.65 : 0.5;
+      return { isProper: true, confidence, reason: 'морфология: ' + morph.type, morph };
+    }
+
+    // Проверяем на инициалы
+    if (/^[А-ЯЁ]\.?$/.test(word)) {
+      return { isProper: true, confidence: 0.75, reason: 'инициал' };
+    }
+
+    // Если слово с заглавной и не в начале предложения, но не определилось морфологически
+    // Проверяем на длину и паттерны
+    if (word.length >= 2 && word.length <= 30 && /^[А-ЯЁ][а-яё-]+$/.test(word)) {
+      return { isProper: true, confidence: 0.4, reason: 'слово с заглавной' };
+    }
+
+    return { isProper: false, confidence: 0 };
+  }
+
+  /**
+   * Полный анализ слова
+   */
+  function analyzeWord(word, context) {
+    const proper = isProperNoun(word, context);
+    const morph = detectCase(word);
+    const lemma = morph ? lemmatize(word, morph) : word;
+
+    return {
+      word,
+      lemma,
+      morph,
+      isProper: proper.isProper,
+      confidence: proper.confidence,
+      reason: proper.reason
+    };
+  }
+
+  /**
+   * Проверяет, является ли слово маркером ФИО
+   */
+  function isFioMarker(word) {
+    if (!word) return false;
+    const w = word.toLowerCase().replace(/[^а-яё]/g, '');
+    return FIO_MARKERS.some(m => m.toLowerCase() === w || w.includes(m.toLowerCase()));
+  }
+
+  /**
+   * Возвращает список возможных падежей для предлога
+   */
+  function getPrepositionCases(prep) {
+    const p = prep.toLowerCase().replace(/[^а-яё]/g, '');
+    return PREP_GOVERNMENT[p] || ['genitive']; // по умолчанию родительный
+  }
+
+  /**
+   * Проверяет согласование по роду и числу (упрощённо)
+   */
+  function agree(gender1, gender2) {
+    return gender1 === gender2 || gender1 === null || gender2 === null;
+  }
+
+  // ============ ПУБЛИЧНЫЙ API ============
+  return {
+    detectCase,
+    lemmatize,
+    isProperNoun,
+    analyzeWord,
+    isFioMarker,
+    getPrepositionCases,
+    agree,
+    SURNAME_M,
+    SURNAME_F,
+    NAME_M,
+    NAME_F,
+    PATR_M,
+    PATR_F,
+    FIO_MARKERS,
+    PREP_GOVERNMENT,
+    CITY_ENDINGS,
+    STREET_ENDINGS
+  };
+})();
+
+// Экспорт для Node.js и браузера
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = MorphEngine;
+}
+
+</script>
+<script>
+// ============================================
+// GRAMMAR-ANALYZER.JS — Синтаксический анализатор русского языка
+// Версия 1.0 — оптимизирован для анонимизации
+// ============================================
+
+const GrammarAnalyzer = (function() {
+  'use strict';
+
+  // Предполагаем, что MorphEngine загружен до этого
+  const ME = (typeof MorphEngine !== 'undefined') ? MorphEngine : null;
+
+  // Глаголы-связки и краткие прилагательные (признаки сказуемого)
+  const COPULA_WORDS = new Set([
+    'является','являются','являвшийся','являвшаяся','являвшиеся',
+    'есть','был','была','были','было','будет','будут','будучи',
+    'становится','становятся','стал','стала','стали','стало',
+    'остается','остаются','остался','осталась','остались','осталось',
+    'казался','казалась','казались','казалось',
+    'являлся','являлась','являлись','являлось',
+    'приходится','приходилось',
+    'может','могут','мог','могла','могли','могло',
+    'должен','должна','должны','должно',
+    'обязан','обязана','обязаны','обязано',
+    'вправе','способен','способна','способны'
+  ]);
+
+  // Причастия и деепричастия, часто предшествующие ФИО
+  const PARTICIPLES = new Set([
+    'проживающий','проживающая','проживающие','проживающее',
+    'проживающего','проживающей','проживающих','проживающему','проживающим','проживающем',
+    'зарегистрированный','зарегистрированная','зарегистрированные','зарегистрированное',
+    'зарегистрированного','зарегистрированной','зарегистрированных',
+    'работающий','работающая','работающие',
+    'состоящий','состоящая','состоящие',
+    'имеющий','имеющая','имеющие',
+    'обладающий','обладающая','обладающие',
+    'уполномоченный','уполномоченная','уполномоченные',
+    'управляющий','управляющая','управляющие',
+    'являющийся','являющаяся','являющиеся',
+    'действующий','действующая','действующие',
+    'находящийся','находящаяся','находящиеся',
+    'постоянно','временно','фактически','фактический','фактическая'
+  ]);
+
+  // Предлоги, после которых часто идут адреса
+  const ADDRESS_PREPS = new Set([
+    'по','в','на','у','около','возле','мимо','через','сквозь',
+    'вдоль','напротив','позади','впереди','сзади','справа','слева',
+    'внутри','снаружи','вне','кроме','вместо','вроде','наподобие'
+  ]);
+
+  // Слова-маркеры адреса
+  const ADDRESS_MARKERS = new Set([
+    'адрес','адресу','адреса','адресом','адресе',
+    'место','месту','места','местом','месте',
+    'жительства','жительство','проживания','пребывания','регистрации',
+    'прописки','прописка','фактический','фактическому','фактического',
+    'почтовый','почтовому','почтового','юридический','юридическому','юридического'
+  ]);
+
+  // ============ РАЗБИЕНИЕ НА ПРЕДЛОЖЕНИЯ ============
+
+  function splitSentences(text) {
+    // Учитываем сокращения, инициалы, даты
+    const protectedWords = [];
+    let protectedText = text;
+
+    // Защищаем инициалы (А.В.)
+    protectedText = protectedText.replace(/([А-ЯЁ]\.\s*[А-ЯЁ]\.)/g, function(match) {
+      protectedWords.push(match);
+      return '__INIT__' + (protectedWords.length - 1) + '__';
+    });
+
+    // Защищаем даты
+    protectedText = protectedText.replace(/(\d{1,2}[.\/]\d{1,2}[.\/]\d{2,4})/g, function(match) {
+      protectedWords.push(match);
+      return '__DATE__' + (protectedWords.length - 1) + '__';
+    });
+
+    // Защищаем сокращения
+    const abbreviations = /(т\.е\.|т\.к\.|и\.т\.д\.|и\.т\.п\.|д\.р\.|т\.н\.|н\.э\.|до н\.э\.|в\.в\.|в\.\s*н\.э\.|г\.|гг\.|ул\.|пр\.|д\.|кв\.|к\.|стр\.|оф\.|эт\.|под\.|мкр\.|пгт\.|обл\.|р-н|р\.|респ\.|кр\.|ао|ооо|зао|пао|тоо|чуп|ип)/gi;
+    protectedText = protectedText.replace(abbreviations, function(match) {
+      protectedWords.push(match);
+      return '__ABBR__' + (protectedWords.length - 1) + '__';
+    });
+
+    // Разбиваем на предложения
+    const sentences = [];
+    const parts = protectedText.split(/([.!?]+(?:\s+|$))/);
+    let current = '';
+
+    for (let i = 0; i < parts.length; i++) {
+      current += parts[i];
+      if (/[.!?]+(?:\s+|$)$/.test(parts[i])) {
+        if (current.trim().length > 0) {
+          sentences.push({ text: current.trim(), start: text.indexOf(current.trim()) });
+        }
+        current = '';
+      }
+    }
+    if (current.trim().length > 0) {
+      sentences.push({ text: current.trim(), start: text.indexOf(current.trim()) });
+    }
+
+    // Восстанавливаем защищённые фрагменты
+    for (let i = 0; i < sentences.length; i++) {
+      sentences[i].text = sentences[i].text
+        .replace(/__INIT__(\d+)__/g, function(m, idx) { return protectedWords[parseInt(idx)]; })
+        .replace(/__DATE__(\d+)__/g, function(m, idx) { return protectedWords[parseInt(idx)]; })
+        .replace(/__ABBR__(\d+)__/g, function(m, idx) { return protectedWords[parseInt(idx)]; });
+    }
+
+    return sentences;
+  }
+
+  // ============ РАЗБИЕНИЕ НА СЛОВА С КОНТЕКСТОМ ============
+
+  function tokenize(sentence) {
+    const words = [];
+    const regex = /[А-ЯЁа-яёA-Za-z0-9]+|[.,!?;:\-–—""''()\[\]]+/g;
+    let m;
+    while ((m = regex.exec(sentence.text)) !== null) {
+      words.push({
+        word: m[0],
+        start: sentence.start + m.index,
+        end: sentence.start + m.index + m[0].length,
+        isPunct: /^[.,!?;:\-–—""''()\[\]]+$/.test(m[0]),
+        isNumber: /^[0-9]+$/.test(m[0]),
+        isInit: /^[А-ЯЁ]\.?$/.test(m[0])
+      });
+    }
+    return words;
+  }
+
+  // ============ ПОИСК ПОДЛЕЖАЩЕГО И СКАЗУЕМОГО ============
+
+  function findSubjectPredicate(words) {
+    const result = { subject: null, predicate: null };
+
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (w.isPunct || w.isNumber) continue;
+
+      const lower = w.word.toLowerCase();
+
+      // Ищем сказуемое (глагол-связка)
+      if (COPULA_WORDS.has(lower)) {
+        result.predicate = w;
+        // Ищем подлежащее слева
+        for (let j = i - 1; j >= 0; j--) {
+          if (words[j].isPunct) continue;
+          if (!words[j].isNumber && !words[j].isInit) {
+            const morph = ME ? ME.analyzeWord(words[j].word, { isSentenceStart: j === 0 }) : null;
+            if (morph && morph.morph && morph.morph.case === 'nominative') {
+              result.subject = words[j];
+              break;
+            }
+            // Если слово с заглавной и не в начале — возможно подлежащее
+            if (/^[А-ЯЁ]/.test(words[j].word) && j > 0) {
+              result.subject = words[j];
+              break;
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    return result;
+  }
+
+  // ============ ПОИСК ПРЕДЛОЖНЫХ ГРУПП ============
+
+  function findPrepositionalPhrases(words) {
+    const phrases = [];
+
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (w.isPunct || w.isNumber) continue;
+
+      const lower = w.word.toLowerCase();
+
+      // Проверяем, является ли слово предлогом
+      if (ME && ME.PREP_GOVERNMENT && ME.PREP_GOVERNMENT[lower]) {
+        const prepCases = ME.getPrepositionCases(lower);
+        const phrase = {
+          preposition: w,
+          words: [w],
+          expectedCases: prepCases,
+          nouns: [],
+          isAddressContext: ADDRESS_PREPS.has(lower)
+        };
+
+        // Собираем слова группы
+        let j = i + 1;
+        while (j < words.length && !words[j].isPunct && j < i + 10) {
+          phrase.words.push(words[j]);
+
+          // Проверяем, является ли слово существительным в нужном падеже
+          if (!words[j].isNumber && !words[j].isInit) {
+            const morph = ME ? ME.analyzeWord(words[j].word, {}) : null;
+            if (morph && morph.morph) {
+              if (prepCases.includes(morph.morph.case)) {
+                phrase.nouns.push({ word: words[j], morph: morph.morph });
+              }
+            }
+          }
+
+          // Проверяем маркеры адреса
+          if (ADDRESS_MARKERS.has(words[j].word.toLowerCase())) {
+            phrase.isAddressMarker = true;
+          }
+
+          // Проверяем, не является ли следующее слово новым предлогом или союзом
+          const nextLower = words[j].word.toLowerCase();
+          if (j < words.length - 1 && ME && ME.PREP_GOVERNMENT && ME.PREP_GOVERNMENT[nextLower]) {
+            break;
+          }
+
+          j++;
+        }
+
+        phrases.push(phrase);
+      }
+    }
+
+    return phrases;
+  }
+
+  // ============ ПОИСК ФИО-КОНСТРУКЦИЙ ============
+
+  function findFioConstructions(words) {
+    const constructions = [];
+
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (w.isPunct || w.isNumber) continue;
+
+      const lower = w.word.toLowerCase();
+
+      // Проверяем маркеры ФИО
+      if (ME && ME.isFioMarker && ME.isFioMarker(w.word)) {
+        const construction = {
+          marker: w,
+          words: [w],
+          fioWords: [],
+          type: 'marker_fio'
+        };
+
+        // Собираем ФИО после маркера
+        let j = i + 1;
+        let fioCount = 0;
+        while (j < words.length && fioCount < 5 && j < i + 8) {
+          if (words[j].isPunct) {
+            // Разрешаем точку после инициалов
+            if (words[j].word === '.' && j > 0 && /^[А-ЯЁ]$/.test(words[j-1].word)) {
+              construction.words.push(words[j]);
+              j++;
+              continue;
+            }
+            break;
+          }
+
+          if (words[j].isNumber) break;
+
+          const morph = ME ? ME.analyzeWord(words[j].word, { isSentenceStart: false }) : null;
+
+          // Проверяем, является ли слово частью ФИО
+          if (morph && morph.isProper && morph.confidence > 0.5) {
+            construction.fioWords.push({ word: words[j], morph: morph.morph });
+            construction.words.push(words[j]);
+            fioCount++;
+          } else if (words[j].isInit) {
+            construction.fioWords.push({ word: words[j], morph: { type: 'initial' } });
+            construction.words.push(words[j]);
+            fioCount++;
+          } else if (/^[А-ЯЁ][а-яё]+$/.test(words[j].word) && fioCount > 0) {
+            // Если уже есть части ФИО, продолжаем собирать
+            construction.fioWords.push({ word: words[j], morph: morph ? morph.morph : null });
+            construction.words.push(words[j]);
+            fioCount++;
+          } else {
+            break;
+          }
+
+          j++;
+        }
+
+        if (construction.fioWords.length > 0) {
+          constructions.push(construction);
+        }
+      }
+
+      // Проверяем причастия с ФИО
+      if (PARTICIPLES.has(lower)) {
+        const construction = {
+          marker: w,
+          words: [w],
+          fioWords: [],
+          type: 'participle_fio'
+        };
+
+        let j = i + 1;
+        // Пропускаем предлоги
+        while (j < words.length && !words[j].isPunct && !words[j].isNumber) {
+          const nextLower = words[j].word.toLowerCase();
+          if (ME && ME.PREP_GOVERNMENT && ME.PREP_GOVERNMENT[nextLower]) {
+            construction.words.push(words[j]);
+            j++;
+            // Собираем предложную группу
+            while (j < words.length && !words[j].isPunct && j < i + 10) {
+              const morph = ME ? ME.analyzeWord(words[j].word, {}) : null;
+              if (morph && morph.isProper && morph.confidence > 0.5) {
+                construction.fioWords.push({ word: words[j], morph: morph.morph });
+                construction.words.push(words[j]);
+              } else if (words[j].isInit) {
+                construction.fioWords.push({ word: words[j], morph: { type: 'initial' } });
+                construction.words.push(words[j]);
+              } else if (/^[0-9]/.test(words[j].word)) {
+                construction.words.push(words[j]);
+              } else if (!ME || !ME.PREP_GOVERNMENT || !ME.PREP_GOVERNMENT[words[j].word.toLowerCase()]) {
+                // Проверяем, не закончилась ли группа
+                if (morph && !morph.isProper) break;
+              }
+              j++;
+            }
+            break;
+          }
+
+          // Если не предлог, проверяем на ФИО напрямую
+          const morph = ME ? ME.analyzeWord(words[j].word, {}) : null;
+          if (morph && morph.isProper && morph.confidence > 0.5) {
+            construction.fioWords.push({ word: words[j], morph: morph.morph });
+            construction.words.push(words[j]);
+            j++;
+          } else if (words[j].isInit) {
+            construction.fioWords.push({ word: words[j], morph: { type: 'initial' } });
+            construction.words.push(words[j]);
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        if (construction.fioWords.length > 0) {
+          constructions.push(construction);
+        }
+      }
+    }
+
+    return constructions;
+  }
+
+  // ============ ПОИСК АДРЕСНЫХ КОНСТРУКЦИЙ ============
+
+  function findAddressConstructions(words) {
+    const addresses = [];
+
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      if (w.isPunct || w.isNumber) continue;
+
+      const lower = w.word.toLowerCase();
+
+      // Проверяем маркеры адреса
+      if (ADDRESS_MARKERS.has(lower)) {
+        const addr = {
+          marker: w,
+          words: [w],
+          addressWords: [],
+          type: 'address'
+        };
+
+        let j = i + 1;
+        while (j < words.length && j < i + 15) {
+          if (words[j].isPunct && words[j].word !== ',' && words[j].word !== '.') break;
+
+          if (words[j].isNumber) {
+            addr.addressWords.push({ word: words[j] });
+            addr.words.push(words[j]);
+            j++;
+            continue;
+          }
+
+          const morph = ME ? ME.analyzeWord(words[j].word, {}) : null;
+          if (morph && (morph.morph && (morph.morph.type === 'city' || morph.morph.type === 'street'))) {
+            addr.addressWords.push({ word: words[j], morph: morph.morph });
+            addr.words.push(words[j]);
+            j++;
+          } else if (/^(?:ул|улица|пр|просп|пр-т|проспект|пер|переулок|б|бул|б-р|бульвар|наб|набережная|ш|шоссе|туп|тупик|аллея|линия|проезд|тракт|д|дом|кв|квартира|к|корп|корпус|стр|строение|оф|офис|комн|комната|эт|этаж|под|подъезд|мкр|микр|п|пос|посёлок|пгт|д|дер|деревня|с|село|ст|станция|хут|хутор|г|гор|город)$/i.test(words[j].word)) {
+            addr.addressWords.push({ word: words[j], type: 'marker' });
+            addr.words.push(words[j]);
+            j++;
+          } else if (/^[А-ЯЁ][а-яё]+$/.test(words[j].word) && addr.addressWords.length > 0) {
+            addr.addressWords.push({ word: words[j] });
+            addr.words.push(words[j]);
+            j++;
+          } else if (words[j].word === ',' && addr.addressWords.length > 0) {
+            addr.words.push(words[j]);
+            j++;
+          } else {
+            break;
+          }
+        }
+
+        if (addr.addressWords.length > 0) {
+          addresses.push(addr);
+        }
+      }
+
+      // Проверяем предлоги адреса
+      if (ADDRESS_PREPS.has(lower)) {
+        const morph = ME ? ME.analyzeWord(words[i+1] ? words[i+1].word : '', {}) : null;
+        if (morph && morph.morph && (morph.morph.type === 'city' || morph.morph.type === 'street')) {
+          const addr = {
+            marker: w,
+            words: [w, words[i+1]],
+            addressWords: [{ word: words[i+1], morph: morph.morph }],
+            type: 'address_prep'
+          };
+          addresses.push(addr);
+        }
+      }
+    }
+
+    return addresses;
+  }
+
+  // ============ ПОЛНЫЙ АНАЛИЗ ПРЕДЛОЖЕНИЯ ============
+
+  function analyzeSentence(sentence) {
+    const words = tokenize(sentence);
+    const subjectPred = findSubjectPredicate(words);
+    const prepPhrases = findPrepositionalPhrases(words);
+    const fioConstructions = findFioConstructions(words);
+    const addressConstructions = findAddressConstructions(words);
+
+    // Дополняем слова морфологической информацией
+    for (let i = 0; i < words.length; i++) {
+      const ctx = {
+        isSentenceStart: i === 0,
+        prevWord: i > 0 ? words[i-1].word : null,
+        nextWord: i < words.length - 1 ? words[i+1].word : null
+      };
+      words[i].analysis = ME ? ME.analyzeWord(words[i].word, ctx) : null;
+    }
+
+    return {
+      sentence,
+      words,
+      subject: subjectPred.subject,
+      predicate: subjectPred.predicate,
+      prepositionalPhrases: prepPhrases,
+      fioConstructions,
+      addressConstructions
+    };
+  }
+
+  // ============ ПОЛНЫЙ АНАЛИЗ ТЕКСТА ============
+
+  function analyzeText(text) {
+    const sentences = splitSentences(text);
+    const results = [];
+
+    for (const sentence of sentences) {
+      results.push(analyzeSentence(sentence));
+    }
+
+    return {
+      text,
+      sentences: results,
+      allFioWords: extractAllFioWords(results),
+      allAddressWords: extractAllAddressWords(results),
+      allProperNouns: extractAllProperNouns(results)
+    };
+  }
+
+  function extractAllFioWords(results) {
+    const fioWords = [];
+    for (const sent of results) {
+      for (const constr of sent.fioConstructions) {
+        for (const fw of constr.fioWords) {
+          fioWords.push({
+            word: fw.word,
+            start: fw.word.start,
+            end: fw.word.end,
+            type: 'fio',
+            construction: constr.type,
+            morph: fw.morph
+          });
+        }
+      }
+    }
+    return fioWords;
+  }
+
+  function extractAllAddressWords(results) {
+    const addrWords = [];
+    for (const sent of results) {
+      for (const constr of sent.addressConstructions) {
+        for (const aw of constr.addressWords) {
+          let token = null;
+          if (aw.word && typeof aw.word === 'object' && aw.word.start !== undefined) {
+            token = aw.word;
+          } else if (aw.start !== undefined) {
+            token = aw;
+          } else if (typeof aw === 'string') {
+            continue;
+          }
+          if (token) {
+            addrWords.push({
+              word: token,
+              start: token.start,
+              end: token.end,
+              type: 'address',
+              construction: constr.type
+            });
+          }
+        }
+      }
+    }
+    return addrWords;
+  }
+
+  function extractAllProperNouns(results) {
+    const properNouns = [];
+    for (const sent of results) {
+      for (const w of sent.words) {
+        if (w.analysis && w.analysis.isProper && w.analysis.confidence > 0.6) {
+          properNouns.push({
+            word: w,
+            start: w.start,
+            end: w.end,
+            type: w.analysis.morph ? w.analysis.morph.type : 'proper',
+            confidence: w.analysis.confidence
+          });
+        }
+      }
+    }
+    return properNouns;
+  }
+
+  // ============ ПУБЛИЧНЫЙ API ============
+  return {
+    splitSentences,
+    tokenize,
+    findSubjectPredicate,
+    findPrepositionalPhrases,
+    findFioConstructions,
+    findAddressConstructions,
+    analyzeSentence,
+    analyzeText,
+    extractAllFioWords,
+    extractAllAddressWords,
+    extractAllProperNouns,
+    COPULA_WORDS,
+    PARTICIPLES,
+    ADDRESS_PREPS,
+    ADDRESS_MARKERS
+  };
+})();
+
+// Экспорт
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = GrammarAnalyzer;
+}
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <style>
 :root{--bg:#f5f5f7;--surface:#fff;--surface-2:#f0f0f2;--border:#d1d1d6;--text:#1d1d1f;--text-2:#48484a;--text-3:#8e8e93;--accent:#0071e3;--accent-2:#5e5ce6;--danger:#ff3b30;--positive:#34c759;--warning:#ff9500;--info:#5ac8fa;--radius:12px;--radius-sm:8px;--shadow:0 4px 24px rgba(0,0,0,.08);--font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;--font-mono:'SF Mono',Menlo,Monaco,Consolas,monospace}
 @media(prefers-color-scheme:dark){:root{--bg:#000;--surface:#1c1c1e;--surface-2:#2c2c2e;--border:#38383a;--text:#f5f5f7;--text-2:#98989d;--text-3:#636366;--accent:#0a84ff;--accent-2:#5e5ce6;--danger:#ff453a;--positive:#30d158;--warning:#ff9f0a;--info:#64d2ff}}
@@ -89,26 +1112,37 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 .stopwords-area{margin-top:12px}
 .stopwords-area textarea{min-height:60px;font-family:var(--font);font-size:12px}
 .flex{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-
 .toolbar{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .toolbar .btn{font-size:12px;padding:6px 14px}
 .warn-box{background:var(--warning);color:#fff;padding:10px 14px;border-radius:var(--radius-sm);font-size:13px;margin-bottom:12px;display:none}
 .warn-box.show{display:block}
+.engine-status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;background:var(--surface-2);color:var(--text-2);margin-left:8px}
+.engine-status.ok{background:rgba(52,199,89,.15);color:var(--positive)}
+.engine-status.err{background:rgba(255,59,48,.15);color:var(--danger)}
+.anm-len{opacity:.45;cursor:pointer;margin-left:3px;font-size:10px;line-height:1;border:1px solid currentColor;border-radius:3px;padding:0 3px;user-select:none;vertical-align:middle}
+.anm-hl:hover .anm-len{opacity:1}
+.anm-hl{position:relative}
+.anm-hl::after{content:var(--anm-chip);font-size:9px;opacity:.6;margin-left:4px;vertical-align:super;white-space:nowrap;pointer-events:none}
+.anm-mode{cursor:pointer;padding:4px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;color:var(--text-2);user-select:none;white-space:nowrap}
+.anm-mode.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<base target="_blank">
+<base target="_blank">
 </head>
 <body>
 <div class="app">
 <header>
-<h1>Анонимизатор Pro <span class="badge">v5.0</span></h1>
+<h1>Анонимизатор Pro <span class="badge">v7.3 МОРФ+ГРАМ</span></h1>
 <div class="theme-switcher">
 <button class="theme-btn active" data-theme="system" title="Системная">🌓</button>
 <button class="theme-btn" data-theme="light" title="Светлая">☀️</button>
 <button class="theme-btn" data-theme="dark" title="Тёмная">🌙</button>
 </div>
-<p>ФИО по ключевым маркерам · адреса только с цифрами</p>
+<p>Три уровня защиты: Морфология + Грамматика + Словари</p>
+<div style="margin-top:8px">
+<span class="engine-status" id="morphStatus">⏳ MorphEngine...</span>
+<span class="engine-status" id="gramStatus">⏳ GrammarAnalyzer...</span>
+</div>
 </header>
 
 <div class="grid">
@@ -117,7 +1151,7 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
 <div>Перетащите файл (.txt, .md, .docx, .pdf) или нажмите для выбора</div>
-<div class="small">Данные не покидают браузер.</div>
+<div class="small">Все вычисления в браузере. Данные никуда не отправляются.</div>
 </div>
 <input type="file" id="fileInput" accept=".txt,.md,.docx,.pdf" style="display:none">
 <textarea id="sourceText" placeholder="Вставьте текст документа сюда..." style="margin-top:12px"></textarea>
@@ -134,25 +1168,7 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 <button class="toggle-btn" data-mode="reversible" onclick="window.setMode('reversible')">С восстановлением</button>
 </div>
 <div class="small" id="modeHint">Заменяет данные на плейсхолдеры.</div>
-<div style="margin-top:12px">
-<div class="settings-row">
-<label>Общая чувствительность:</label>
-<input type="range" id="sensitivity" min="1" max="3" value="2" oninput="window.updateSensitivity(this.value)">
-<span class="slider-val" id="sensVal">Средняя</span>
-</div>
-<div class="settings-row">
-<label>Порог срабатывания:</label>
-<input type="range" id="fioStrictness" min="0" max="100" value="50" oninput="window.updateFioStrictness(this.value)">
-<span class="slider-val" id="fioStrictVal">50</span>
-</div>
-<div class="settings-row">
-<label><input type="checkbox" id="strictOnly" onchange="window.updateStrictOnly(this.checked)"> Только строгие (≥70)</label>
-</div>
-<div class="settings-row">
-<label><input type="checkbox" id="validateDict" checked onchange="window.updateValidateDict(this.checked)"> Только со словарём (рекомендуется)</label>
-</div>
-<div class="small">Рекомендуемый порог 50. «Только со словарём» отсекает 95% ложных ФИО.</div>
-</div>
+<div style="margin-top:12px"></div>
 <div class="stopwords-area">
 <label class="small" style="font-weight:500;">Стоп-слова (не маскировать):</label>
 <textarea id="stopWordsInput" placeholder="Слова, которые не должны заменяться (через запятую или пробел)&#10;например: предоставлении, разъяснении, Щучинская, больница"></textarea>
@@ -170,13 +1186,18 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 <label class="chip checked" data-type="phone"><input type="checkbox" checked> Телефоны</label>
 <label class="chip checked" data-type="email"><input type="checkbox" checked> Email</label>
 <label class="chip checked" data-type="id"><input type="checkbox" checked> Документы</label>
+<label class="chip checked" data-type="inn"><input type="checkbox" checked> ИНН</label>
+<label class="chip checked" data-type="snils"><input type="checkbox" checked> СНИЛС</label>
+<label class="chip checked" data-type="ogrn"><input type="checkbox" checked> ОГРН</label>
+<label class="chip checked" data-type="passby"><input type="checkbox" checked> Паспорт РБ</label>
+<label class="chip" data-type="net"><input type="checkbox"> MAC/GPS</label>
 <label class="chip" data-type="card"><input type="checkbox"> Банковские карты</label>
-<label class="chip" data-type="date"><input type="checkbox" checked> Даты рождения</label>
+<label class="chip checked" data-type="date"><input type="checkbox" checked> Даты рождения</label>
 <label class="chip" data-type="ip"><input type="checkbox"> IP-адреса</label>
 <label class="chip" data-type="url"><input type="checkbox"> URL</label>
 <label class="chip" data-type="vehicle"><input type="checkbox"> Гос. номера</label>
 <label class="chip" data-type="money"><input type="checkbox"> Суммы</label>
-<label class="chip" data-type="company"><input type="checkbox"> Юр. лица</label>
+<label class="chip checked" data-type="company"><input type="checkbox" checked> Юр. лица</label>
 </div>
 <div class="small" style="margin-top:8px;">Для исков отключите «Суммы».</div>
 </div>
@@ -184,7 +1205,7 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 <div class="card">
 <div class="card-title"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Пользовательские слова</div>
 <div class="small">Добавьте фамилии, имена, отчества, города, улицы – через запятую.</div>
-<input type="text" id="customNames" placeholder="Серко, Генриховна, Щцчин, Островского, ..." style="margin-top:8px">
+<input type="text" id="customNames" placeholder="Серко, Генриховна, Щучин, Островского, ..." style="margin-top:8px">
 </div>
 </div>
 
@@ -205,8 +1226,10 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 <div class="tab active" onclick="window.switchTab('preview')" id="tab-preview">Предпросмотр</div>
 <div class="tab" onclick="window.switchTab('matches')" id="tab-matches">Найденные совпадения <span id="matchCountBadge" style="background:var(--accent);color:#fff;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;"></span></div>
 <div class="tab" onclick="window.switchTab('text')" id="tab-text">Чистый текст</div>
+<div class="tab" onclick="window.switchTab('grammar')" id="tab-grammar">Грамматический разбор</div>
 </div>
 <div class="tab-content active" id="content-preview">
+<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><span class="small">Сплошная область — будет скрыта, пунктир — останется. Режим «🙈 Скрывать»: клик по области или слову скрывает его. Режим «✓ Оставлять»: клик возвращает оригинал. Выделение текста + «Скрыть выделенное» задаёт точные границы.</span><span class="anm-mode on" id="anmModeHide" title="Клик по области или слову скрывает его">🙈 Клик — скрывать</span><span class="anm-mode" id="anmModeKeep" title="Клик по области оставляет оригинал в тексте">✓ Клик — оставлять</span><button class="btn btn-secondary" id="anmHideSel" style="padding:4px 14px;font-size:12px" disabled>🙈 Скрыть выделенное</button><button class="btn btn-secondary" id="anmUndo" style="padding:4px 14px;font-size:12px" disabled>↶ Отменить</button><button class="btn btn-secondary" id="anmResetEdits" style="padding:4px 14px;font-size:12px" disabled>Сбросить правки</button></div>
 <div class="preview" id="preview"></div>
 <div class="legend" id="legend"></div>
 </div>
@@ -215,6 +1238,9 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 </div>
 <div class="tab-content" id="content-text">
 <textarea id="cleanText" style="min-height:300px;margin-top:0"></textarea>
+</div>
+<div class="tab-content" id="content-grammar">
+<div class="preview" id="grammarPreview" style="font-size:12px"></div>
 </div>
 <div class="actions">
 <button class="btn" onclick="window.downloadResult()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Скачать .txt</button>
@@ -243,22 +1269,44 @@ footer{text-align:center;font-size:12px;color:var(--text-3);padding:24px 0}
 <div class="card">
 <div class="card-title"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>Справка</div>
 <div class="small" style="line-height:1.7">
-<b>v5.0 — что нового:</b><br>
-• ФИО-паттерны стали регистро-зависимыми — больше не ловят строчные слова.<br>
-• Обязательная словарная проверка — кандидат в ФИО должен содержать известную фамилию, имя или отчество.<br>
-• Адреса объединяются в единые блоки (квартира приклеивается к дому).<br>
-• Встроенный стоп-лист расширен до 800+ слов.<br>
-• Двойное подтверждение для телефонов, документов, дат.
+<b>v6.0 — Три уровня защиты:</b><br>
+• <b>MorphEngine</b> — определяет падежи, склонения, лемматизирует слова.<br>
+• <b>GrammarAnalyzer</b> — находит подлежащее/сказуемое, предложные группы, конструкции с ФИО.<br>
+• <b>Словари + эвристики</b> — проверка по известным именам, фамилиям, городам.<br>
+• Теперь «ИП Малютину С.И.» гарантированно распознаётся!<br>
+• Распространение ФИО работает с учётом падежей.
 </div>
 </div>
 </div>
 
-<footer>Анонимизатор Pro v5.0 — улучшенная версия</footer>
+<footer>Анонимизатор Pro v7.3 — Морфология + Грамматика + Словари</footer>
 </div>
 
 <script>
 (function(){
 'use strict';
+
+// ========== ПРОВЕРКА ДВИЖКОВ ==========
+var morphStatus = document.getElementById('morphStatus');
+var gramStatus = document.getElementById('gramStatus');
+var morphEngineAvailable = (typeof MorphEngine !== 'undefined');
+var grammarAnalyzerAvailable = (typeof GrammarAnalyzer !== 'undefined');
+
+if (morphEngineAvailable) {
+  morphStatus.textContent = '✅ MorphEngine';
+  morphStatus.className = 'engine-status ok';
+} else {
+  morphStatus.textContent = '❌ MorphEngine';
+  morphStatus.className = 'engine-status err';
+}
+
+if (grammarAnalyzerAvailable) {
+  gramStatus.textContent = '✅ GrammarAnalyzer';
+  gramStatus.className = 'engine-status ok';
+} else {
+  gramStatus.textContent = '❌ GrammarAnalyzer';
+  gramStatus.className = 'engine-status err';
+}
 
 // ========== DOM ==========
 var $ = function(id){ return document.getElementById(id); };
@@ -272,6 +1320,7 @@ var legend = $('legend');
 var matchList = $('matchList');
 var matchCountBadge = $('matchCountBadge');
 var cleanText = $('cleanText');
+var grammarPreview = $('grammarPreview');
 var downloadMapBtn = $('downloadMapBtn');
 var modeHint = $('modeHint');
 var customNamesInput = $('customNames');
@@ -285,18 +1334,30 @@ var sensitivity = 2;
 var fioThreshold = 50;
 var strictOnly = false;
 var validateDict = true;
+var useMorphology = true;
+var useGrammar = true;
 var replacementMap = {};
 var resultText = '';
 var allFoundMatches = [];
+var lastGrammarResult = null;
+var lastOriginalText = '';
+var lastMatches = [];
+var matchOverrides = {};
+var uiState = {};
+var editHistory = [];
+var clickMode = 'hide';
+var pristineMatches = null;
+var loadedExt = '';
+var loadedBaseName = 'anonymized';
 
 // ========== СЛОВАРИ ==========
 var typeLabels = {
-  fio:'ФИО', address:'Адрес', phone:'Телефон', email:'Email', id:'Документ',
+  fio:'ФИО', address:'Адрес', phone:'Телефон', email:'Email', id:'Документ', inn:'ИНН', snils:'СНИЛС', ogrn:'ОГРН', passby:'Паспорт РБ', net:'MAC/GPS',
   card:'Банковская карта', date:'Дата рождения', ip:'IP-адрес', url:'URL',
   vehicle:'Гос. номер', money:'Сумма', company:'Юр. лицо'
 };
 var typeColors = {
-  fio:'#0071e3', address:'#ff3b30', phone:'#34c759', email:'#5e5ce6', id:'#8e8e93',
+  fio:'#0071e3', address:'#ff3b30', phone:'#34c759', email:'#5e5ce6', id:'#8e8e93', inn:'#0a84ff', snils:'#30d158', ogrn:'#ff9f0a', passby:'#bf5af2', net:'#64d2ff',
   card:'#ff3b30', date:'#ff9500', ip:'#5ac8fa', url:'#af52de', vehicle:'#ff2d55', money:'#00c7be', company:'#5856d6'
 };
 
@@ -306,7 +1367,7 @@ var commonNames = 'Александр|Алексей|Анатолий|Андре
 
 var commonPatronymics = 'Александрович|Алексеевич|Анатольевич|Андреевич|Антонович|Аркадьевич|Борисович|Вадимович|Валентинович|Валерьевич|Васильевич|Викторович|Витальевич|Владимирович|Владиславович|Вячеславович|Геннадьевич|Георгиевич|Григорьевич|Данилович|Денисович|Дмитриевич|Евгеньевич|Егорович|Иванович|Игоревич|Ильич|Кириллович|Константинович|Леонидович|Максимович|Михайлович|Никитич|Николаевич|Олегович|Павлович|Петрович|Романович|Русланович|Семёнович|Сергеевич|Станиславович|Степанович|Тарасович|Тимофеевич|Фёдорович|Эдуардович|Юрьевич|Ярославович|Александровна|Алексеевна|Анатольевна|Андреевна|Антоновна|Аркадьевна|Борисовна|Вадимовна|Валентиновна|Валерьевна|Васильевна|Викторовна|Витальевна|Владимировна|Владиславовна|Вячеславовна|Геннадьевна|Георгиевна|Григорьевна|Даниловна|Денисовна|Дмитриевна|Евгеньевна|Егоровна|Ивановна|Игоревна|Ильинична|Кирилловна|Константиновна|Леонидовна|Максимовна|Михайловна|Никитична|Николаевна|Олеговна|Павловна|Петровна|Романовна|Руслановна|Семёновна|Сергеевна|Станиславовна|Степановна|Тарасовна|Тимофеевна|Фёдоровна|Эдуардовна|Юрьевна|Ярославовна|Генриховна|Генрихович|Артёмовна|Артёмович|Демидовна|Демидович|Елисеевна|Елисеевич|Захаровна|Захарович|Игнатовна|Игнатович|Макаровна|Макарович|Марковна|Маркович|Матвеевна|Матвеевич|Платоновна|Платонович|Тихоновна|Тихонович|Федоровна|Федорович|Терентьевич|Терентьевна|Прохоровна|Прохорович|Савельевич|Савельевна|Фомич|Фоминична|Яковлевич|Яковлевна|Алексеевич|Алексеевна|Васильевич|Васильевна|Петрович|Петровна|Сергеевич|Сергеевна|Анатольевич|Анатольевна|Владимирович|Владимировна|Николаевич|Николаевна|Михайлович|Михайловна|Дмитриевич|Дмитриевна|Евгеньевич|Евгеньевна|Игоревич|Игоревна|Валерьевич|Валерьевна|Викторович|Викторовна|Борисович|Борисовна|Григорьевич|Григорьевна|Леонидович|Леонидовна|Константинович|Константиновна|Степанович|Степановна|Тимофеевич|Тимофеевна|Фёдорович|Фёдоровна|Эдуардович|Эдуардовна|Юрьевич|Юрьевна|Ярославович|Ярославовна|Геннадьевич|Геннадьевна|Георгиевич|Георгиевна|Вячеславович|Вячеславовна|Владиславович|Владиславовна|Витальевич|Витальевна|Романович|Романовна|Русланович|Руслановна|Тарасович|Тарасовна|Денисович|Денисовна|Данилович|Даниловна|Максимович|Максимовна|Леонидович|Леонидовна|Кириллович|Кирилловна|Ильич|Ильинична|Савельевич|Савельевна|Аркадьевич|Аркадьевна|Антонович|Антоновна|Андреевич|Андреевна|Вадимович|Вадимовна|Валентинович|Валентиновна|Богданович|Богдановна|Глебович|Глебовна|Дамирович|Дамировна|Елисеевич|Елисеевна|Захарович|Захаровна|Игнатович|Игнатовна|Климович|Климовна|Лукич|Лукинична|Миронович|Мироновна|Назарович|Назаровна|Оскарович|Оскаровна|Прохорович|Прохоровна|Радмирович|Радмировна|Савелиевич|Савелиевна|Тигранович|Тиграновна|Устинович|Устиновна|Филиппович|Филипповна|Харитонович|Харитоновна|Цезаревич|Цезаревна|Чеславович|Чеславовна|Шамильевич|Шамильевна|Эльдарович|Эльдаровна|Юлианович|Юлиановна|Янович|Яновна';
 
-var commonCities = 'Москва|Санкт-Петербург|Новосибирск|Екатеринбург|Нижний Новгород|Казань|Челябинск|Омск|Самара|Ростов-на-Дону|Уфа|Красноярск|Воронеж|Пермь|Волгоград|Краснодар|Саратов|Тюмень|Тольятти|Ижевск|Барнаул|Ульяновск|Иркутск|Хабаровск|Ярославль|Владивосток|Махачкала|Томск|Оренбург|Кемерово|Новокузнецк|Рязань|Астрахань|Набережные Челны|Пенза|Липецк|Киров|Чебоксары|Тула|Калининград|Балашиха|Курск|Ставрополь|Улан-Удэ|Сочи|Тверь|Магнитогорск|Иваново|Брянск|Белгород|Сургут|Владимир|Нижний Тагил|Архангельск|Чита|Калуга|Смоленск|Волжский|Курган|Череповец|Орёл|Вологда|Саранск|Мурманск|Якутск|Подольск|Тамбов|Стерлитамак|Грозный|Кострома|Петрозаводск|Новороссийск|Йошкар-Ола|Таганрог|Нижневартовск|Новочеркасск|Нальчик|Благовещенск|Комсомольск-на-Амуре|Прокопьевск|Шахты|Бийск|Химки|Дзержинск|Королёв|Мытищи|Люберцы|Красногорск|Одинцово|Домодедово|Раменское|Жуковский|Видное|Реутов|Щёлково|Пушкино|Сергиев Посад|Дмитров|Клин|Звенигород|Солнечногорск|Истра|Наро-Фоминск|Чехов|Ступино|Кашира|Озёры|Коломна|Серпухов|Протвино|Обнинск|Троицк|Московский|Щучин|Щцчин';
+var commonCities = 'Москва|Санкт-Петербург|Новосибирск|Екатеринбург|Нижний Новгород|Казань|Челябинск|Омск|Самара|Ростов-на-Дону|Уфа|Красноярск|Воронеж|Пермь|Волгоград|Краснодар|Саратов|Тюмень|Тольятти|Ижевск|Барнаул|Ульяновск|Иркутск|Хабаровск|Ярославль|Владивосток|Махачкала|Томск|Оренбург|Кемерово|Новокузнецк|Рязань|Астрахань|Набережные Челны|Пенза|Липецк|Киров|Чебоксары|Тула|Калининград|Балашиха|Курск|Ставрополь|Улан-Удэ|Сочи|Тверь|Магнитогорск|Иваново|Брянск|Белгород|Сургут|Владимир|Нижний Тагил|Архангельск|Чита|Калуга|Смоленск|Волжский|Курган|Череповец|Орёл|Вологда|Саранск|Мурманск|Якутск|Подольск|Тамбов|Стерлитамак|Грозный|Кострома|Петрозаводск|Новороссийск|Йошкар-Ола|Таганрог|Нижневартовск|Новочеркасск|Нальчик|Благовещенск|Комсомольск-на-Амуре|Прокопьевск|Шахты|Бийск|Химки|Дзержинск|Королёв|Мытищи|Люберцы|Красногорск|Одинцово|Домодедово|Раменское|Жуковский|Видное|Реутов|Щёлково|Пушкино|Сергиев Посад|Дмитров|Клин|Звенигород|Солнечногорск|Истра|Наро-Фоминск|Чехов|Ступино|Кашира|Озёры|Коломна|Серпухов|Протвино|Обнинск|Троицк|Московский|Щучин|Щцчин|Минск|Гродно|Брест|Витебск|Гомель|Могилёв|Барановичи|Борисов|Пинск|Орша|Мозырь|Жлобин|Слуцк|Солигорск|Лида|Полоцк|Новополоцк|Жодино|Речица|Светлогорск|Молодечно|Кобрин|Слоним|Волковыск|Пружаны|Дзержинск|Фаниполь|Вилейка|Сморгонь|Ошмяны|Скидель|Берестовица|Свислочь|Волпень|Гожа|Мосты|Индура|Несвиж|Клецк|Логойск|Старые Дороги|Жабинка|Каменец|Пружаны';
 
 var commonStreets = 'Ленина|Гагарина|Пушкина|Кирова|Мира|Советская|Октябрьская|Коммунистическая|Солнечная|Новая|Школьная|Молодёжная|Садовая|Лесная|Набережная|Лесной|Парковая|Степная|Полевая|Красная|Трудовая|Свободы|Дружбы|Победы|Чкалова|Мичурина|Железнодорожная|Восточная|Западная|Северная|Южная|Центральная|Горького|Чехова|Дзержинского|Калинина|Береговая|Кольцевая|Берёзовая|Механизаторов|Энергетиков|Строителей|Пионерская|Клубная|Спортивная|Кооперативная|Партизанская|Колхозная|Тракторная|Фрунзе|Энгельса|Карла Маркса|Баумана|Куйбышева|Тургенева|Лермонтова|Гоголя|Достоевского|Толстого|Булгакова|Пастернака|Есенина|Ахматовой|Бродского|Шолохова|Горького|Гончарова|Некрасова|Тютчева|Жуковского|Маяковского|Высоцкого|Окуджавы|Кобзона|Ротару|Ваенги|Гурченко|Абдулова|Янковского|Мягкова|Меньшова|Говорухина|Михалковой|Тарковского|Рязанова|Гайдая|Быкова|Аксенова|Стругацких|Лукьяненко|Перумова|Успенского|Остера|Чуковского|Маршака|Барто|Берестова|Заходера|Сутеева|Введенского|Хармса|Каверина|Катаева|Паустовского|Пришвина|Бианки|Сладкова|Шима|Привалова|Фадеева|Бондарева|Бакланова|Войновича|Владимова|Вампилова|Розова|Арбузова|Гельмана|Петрушевской|Толстой|Пелевина|Водолазкина|Сенчина|Славниковой|Гарроса|Евдокимова|Щербаковой|Рубановой|Донцовой|Марининой|Акунина|Черкасовой|Леонова|Дашковой|Устиновой|Александровой|Полянской|Вербицкой|Корчевского|Злотникова|Валентинова|Выставного|Конторовича|Каменева|Емельянова|Силлова|Атаманова|Гарри|Поттера|Красная|Большая|Малая|Первая|Вторая|Третья|Старая|Верхняя|Нижняя|Промышленная|Заводская|Фабричная|Торговая|Рыночная|Вокзальная|Привокзальная|Станционная|Дорожная|Транспортная|Автомобильная|Гаражная|Складская|Почтовая|Телеграфная|Газетная|Журнальная|Книжная|Библиотечная|Музейная|Театральная|Концертная|Цирковая|Кинематографическая|Фотографическая|Художественная|Музыкальная|Хоровая|Оркестровая|Балетная|Оперная|Драматическая|Комедийная|Трагическая|Сатирическая|Юмористическая|Фантастическая|Детективная|Приключенческая|Историческая|Военная|Морская|Воздушная|Космическая|Атомная|Электрическая|Химическая|Биологическая|Медицинская|Фармацевтическая|Ветеринарная|Санитарная|Гигиеническая|Эпидемиологическая|Иммунологическая|Хирургическая|Терапевтическая|Педиатрическая|Гериатрическая|Психиатрическая|Неврологическая|Офтальмологическая|Отоларингологическая|Стоматологическая|Дерматологическая|Венерологическая|Урологическая|Гинекологическая|Акушерская|Онкологическая|Рентгенологическая|Ультразвуковая|Компьютерная|Лазерная|Робототехническая|Нанотехнологическая|Биотехнологическая|Генетическая|Криогенная|Астрономическая|Астрофизическая|Геофизическая|Геологическая|Геодезическая|Картографическая|Гидрологическая|Метеорологическая|Климатическая|Экологическая|Природоохранная|Заповедная|Национальная|Региональная|Муниципальная|Городская|Сельская|Поселковая|Дачная|Садовая|Огородная|Парковая|Скверная|Аллея|Бульвар|Проспект|Переулок|Тупик|Проезд|Набережная|Островского';
 
@@ -327,7 +1388,15 @@ var blacklist = new Set([
   'своим','своих','себя','сказал','сказала','сказали','слова','случай','со',
   'совсем','так','такая','такие','такой','там','те','тем','теперь','то','того',
   'той','только','том','тот','три','у','уже','чего','человек','чем','что','чтобы',
-  'эта','эти','это','этого','этой','этом','этот','я','является'
+  'эта','эти','это','этого','этой','этом','этот','я','является',
+  'дата','дату','дате','датой','даты','адрес','адресу','адресом','адреса',
+  'телефон','телефона','телефону','паспорт','паспорта','паспорту','паспортом',
+  'приказ','заявление','заявления','заявлению','письмо','письма','заказчик','заказчика','заказчику','заказчиком','заказчине','заказчины','заказчиков','задание','задания','заданию','заданием','заданий','приложение','приложения','приложению','приложением','приложений','приложении','договор','договора','договору','договором','сторона','стороны','сторон','исполнитель','исполнителя','исполнителю','исполнителем','акт','акта','акту','актом',
+  'российской','российская','российское','российский','российскую','российских','российским',
+  'федерации','федерацией','федерацию','федерация','республики','республика','республикой',
+  'конституции','конституция','конституцией','кодекса','кодекс','кодексом','процессуального',
+  'гражданского','гражданский','административного','административный','трудового','трудовой',
+  'семейного','семейный','налогового','налоговый','жилищного','жилищный','земельного','земельный'
 ]);
 
 var strongMarkers = new Set([
@@ -385,12 +1454,17 @@ function wbEnd() {
 function setProgress(p) {
   progressBar.style.width = p + '%';
 }
-// ========== СИСТЕМА ПРАВИЛ ДЛЯ ФИО ==========
+function cloneObj(obj) {
+  var clone = {};
+  for (var key in obj) { if (obj.hasOwnProperty(key)) clone[key] = obj[key]; }
+  return clone;
+}
+
+// ========== СИСТЕМА ПРАВИЛ И ШТРАФОВ ДЛЯ ФИО ==========
 var fioRules = [];
-// ========== СИСТЕМА ШТРАФОВ (-%) ДЛЯ ФИО ==========
 var fioPenaltyRules = [];
 
-// Штраф 1: Есть слово, начинающееся со строчной буквы (кардинально)
+// Штрафы
 fioPenaltyRules.push({
   weight: -80,
   desc: 'Есть слово со строчной буквы',
@@ -398,25 +1472,17 @@ fioPenaltyRules.push({
     var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
     for (var i = 0; i < parts.length; i++) {
       var w = parts[i];
-      // Инициалы типа "А." или "А" пропускаем
       if (/^[А-ЯЁа-яё]\.?$/.test(w)) continue;
-      // Если слово начинается со строчной — штраф
       if (/^[а-яё]/.test(w)) return true;
     }
     return false;
   }
 });
-
-// Штраф 2: Содержит цифры или латиницу
 fioPenaltyRules.push({
   weight: -40,
   desc: 'Содержит цифры или латиницу',
-  test: function(text, m) {
-    return /[0-9a-zA-Z]/.test(m.text);
-  }
+  test: function(text, m) { return /[0-9a-zA-Z]/.test(m.text); }
 });
-
-// Штраф 3: Слово из общего стоп-листа (blacklist)
 fioPenaltyRules.push({
   weight: -60,
   desc: 'Слово из общего стоп-листа',
@@ -429,8 +1495,6 @@ fioPenaltyRules.push({
     return false;
   }
 });
-
-// Штраф 4: Только одно слово (слишком сомнительно для ФИО без контекста)
 fioPenaltyRules.push({
   weight: -30,
   desc: 'Только одно слово',
@@ -439,8 +1503,6 @@ fioPenaltyRules.push({
     return parts.length === 1;
   }
 });
-
-// Штраф 5: Нет ни одного слова из словаря (при включённой проверке)
 fioPenaltyRules.push({
   weight: -80,
   desc: 'Нет слова из словаря',
@@ -454,7 +1516,6 @@ fioPenaltyRules.push({
       var w = parts[i].replace(/[^а-яё]/gi,'').toLowerCase();
       if (w.length < 3) continue;
       if (sSet.has(w) || nSet.has(w) || pSet.has(w)) return false;
-      // Проверка по префиксу (падеж)
       var dicts = [sSet, nSet, pSet];
       for (var d = 0; d < dicts.length; d++) {
         var it = dicts[d].values();
@@ -470,8 +1531,6 @@ fioPenaltyRules.push({
     return true;
   }
 });
-
-// Штраф 6: Нет контекста (ни маркеров, ни ролей, ни соседних заглавных слов)
 fioPenaltyRules.push({
   weight: -25,
   desc: 'Нет контекста (маркеров/ролей/соседей)',
@@ -484,7 +1543,6 @@ fioPenaltyRules.push({
     if (hasMarker) return false;
     roles.forEach(function(v){ if (ctx.indexOf(v) !== -1) hasMarker = true; });
     if (hasMarker) return false;
-    // Проверяем соседние заглавные слова (потенциальные ФИО)
     var words = text.slice(start, end).split(/[\s,.!?;:]+/).filter(function(w){ return w.length > 1; });
     var neighborCapital = false;
     for (var i = 0; i < words.length; i++) {
@@ -495,19 +1553,90 @@ fioPenaltyRules.push({
     return !neighborCapital;
   }
 });
-
-// Штраф 7: Слишком короткий или слишком длинный кандидат
 fioPenaltyRules.push({
   weight: -15,
   desc: 'Длина вне диапазона 3–35',
+  test: function(text, m) { return m.text.length < 3 || m.text.length > 35; }
+});
+fioPenaltyRules.push({
+  weight: -100,
+  desc: 'Содержит организационный маркер (ООО, ЗАО и т.п.)',
   test: function(text, m) {
-    return m.text.length < 3 || m.text.length > 35;
+    return /(?:ООО|ОАО|ЗАО|ПАО|ТОО|ЧУП|ИЧУП|ГУП|МУП|ФГУП|ОДО|СП|ТД|НП|АНО|Фонд|компания|корпорация|холдинг|банк|страховая|управление|отдел|комитет|совет|инспекция|служба|учреждение|министерство|ведомство|дирекция|филиал|представительство|объединение|союз|ассоциация)/i.test(m.text);
+  }
+});
+fioPenaltyRules.push({
+  weight: -70,
+  desc: 'Содержит географическое стоп-слово (город, улица и т.п.)',
+  test: function(text, m) {
+    return /(?:город|село|деревня|посёлок|улица|проспект|переулок|шоссе|аллея|набережная|тупик|площадь|бульвар|дом|корпус|квартира|офис|этаж|подъезд|квартал|микрорайон|область|край|регион|район)/i.test(m.text);
+  }
+});
+fioPenaltyRules.push({
+  weight: -80,
+  desc: 'Слово встречается в тексте со строчной буквы',
+  test: function(text, m) {
+    var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 2 && /^[А-ЯЁ][а-яё]+$/.test(p); });
+    for (var i = 0; i < parts.length; i++) {
+      var low = parts[i].toLowerCase();
+      if (new RegExp('(?<![А-ЯЁ])' + low + '(?![а-яё])').test(text)) return true;
+    }
+    return false;
+  }
+});
+fioPenaltyRules.push({
+  weight: -70,
+  desc: 'Одно слово без инициалов и словарной поддержки',
+  test: function(text, m) {
+    var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+    if (parts.length > 1) return false;
+    if (/^[А-ЯЁ]\./.test(parts[0])) return true;
+    var w = parts[0].replace(/[^а-яёА-ЯЁ]/g, '').toLowerCase();
+    if (w.length < 3) return true;
+    // отчества очень специфичны — не штрафуем одиночные
+    if (morphEngineAvailable && useMorphology) {
+      var wm = MorphEngine.detectCase(parts[0]);
+      if (wm && wm.type === 'patronymic') return false;
+    }
+    var dicts = [commonSurnames, commonNames, commonPatronymics];
+    for (var d = 0; d < dicts.length; d++) {
+      var arr = dicts[d].toLowerCase().split('|');
+      for (var i = 0; i < arr.length; i++) {
+        var dw = arr[i];
+        if (dw.length < 3) continue;
+        var minPref = Math.min(w.length, dw.length, 5);
+        if (w.substring(0, minPref) === dw.substring(0, minPref)) return false;
+      }
+    }
+    return true;
+  }
+});
+fioPenaltyRules.push({
+  weight: -80,
+  desc: 'Географическое прилагательное (-ский/-ского от города)',
+  test: function(text, m) {
+    var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 4 && /^[А-ЯЁ][а-яё]+$/.test(p); });
+    var cities = commonCities.toLowerCase().split('|');
+    for (var i = 0; i < parts.length; i++) {
+      var mm = parts[i].toLowerCase().match(/^([а-яё]+?)ск(ий|ого|ому|им|ом|ая|ое|ие|их|ым|ую|ем|ее)$/);
+      if (!mm) continue;
+      var stem = mm[1];
+      for (var c = 0; c < cities.length; c++) {
+        if (cities[c].length >= 4 && (cities[c] === stem + 'ск' || cities[c] === stem)) return true;
+      }
+    }
+    return false;
+  }
+});
+fioPenaltyRules.push({
+  weight: -50,
+  desc: 'Окончание на -ский/-цкий/-овой/-евой (признак прилагательного/названия)',
+  test: function(text, m) {
+    return /[а-яё]*(?:ский|цкий|овой|евой|ской|цкой|овой|евой)$/i.test(m.text);
   }
 });
 
-
-
-// Правило 1: Полное ФИО
+// Правила
 fioRules.push({
   weight: 100,
   desc: 'Полное ФИО (Ф+И+О) из словарей или динамическое отчество',
@@ -534,20 +1663,15 @@ fioRules.push({
     return hasS && hasN && hasP;
   }
 });
-
-// Правило 1.5: Маркер ИП/г-н/г-жа + фамилия + инициалы (компенсирует отсутствие в словаре)
 fioRules.push({
   weight: 100,
   desc: 'Маркер ИП/г-н/г-жа/предприниматель + фамилия + инициалы',
   test: function(text, m) {
-    var lower = m.text.toLowerCase();
     var hasTitle = /(?:^|[\s])(?:ип|г-н|г-жа|господин|госпожа|индивидуальный предприниматель|предприниматель|товарищ|уважаемый|уважаемая)(?:[\s]|$)/i.test(m.text);
     var hasInit = /[А-ЯЁ]\.\s*[А-ЯЁ]\.?/.test(m.text);
     return hasTitle && hasInit;
   }
 });
-
-// Правило 2: Три слова
 fioRules.push({
   weight: 50,
   desc: 'Кандидат состоит ровно из трёх слов',
@@ -556,8 +1680,6 @@ fioRules.push({
     return parts.length === 3;
   }
 });
-
-// Правило 3: Фамилия из словаря
 fioRules.push({
   weight: 70,
   desc: 'Фамилия из словаря (с падежом)',
@@ -573,8 +1695,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 4: Имя из словаря
 fioRules.push({
   weight: 60,
   desc: 'Имя из словаря (с падежом)',
@@ -590,8 +1710,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 5: Отчество
 fioRules.push({
   weight: 70,
   desc: 'Отчество из словаря или динамическое',
@@ -606,8 +1724,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 6: Рядом сильный маркер
 fioRules.push({
   weight: 30,
   desc: 'Рядом сильный маркер',
@@ -622,8 +1738,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 7: Рядом роль
 fioRules.push({
   weight: 15,
   desc: 'Рядом роль',
@@ -638,8 +1752,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 8: Рядом адресный маркер
 fioRules.push({
   weight: 20,
   desc: 'Рядом адресный маркер',
@@ -650,8 +1762,6 @@ fioRules.push({
     return /проживающ|зарегистрирован|место жительства|адрес регистрации/.test(context);
   }
 });
-
-// Правило 9: Рядом дата рождения
 fioRules.push({
   weight: 15,
   desc: 'Рядом дата рождения',
@@ -662,8 +1772,6 @@ fioRules.push({
     return /родился|родилась|года рождения|д\.р\.|дата рождения/.test(context);
   }
 });
-
-// Правило 10: Падежное окончание
 fioRules.push({
   weight: 20,
   desc: 'Падежное окончание',
@@ -672,8 +1780,6 @@ fioRules.push({
     return endings.test(m.text);
   }
 });
-
-// Правило 11: Инициалы
 fioRules.push({
   weight: 20,
   desc: 'Содержит инициалы',
@@ -681,8 +1787,6 @@ fioRules.push({
     return /[А-ЯЁ]\.[ ]*[А-ЯЁ]?\.?/.test(m.text);
   }
 });
-
-// Правило 12: Длина
 fioRules.push({
   weight: 5,
   desc: 'Длина от 3 до 25',
@@ -690,8 +1794,6 @@ fioRules.push({
     return m.text.length >= 3 && m.text.length <= 25;
   }
 });
-
-// Правило 13: Заглавная
 fioRules.push({
   weight: 10,
   desc: 'Начинается с заглавной (не в начале предложения)',
@@ -701,8 +1803,6 @@ fioRules.push({
     return /^[А-ЯЁ]/.test(m.text);
   }
 });
-
-// Правило 14: Соседнее заглавное
 fioRules.push({
   weight: 30,
   desc: 'Рядом другое слово с заглавной',
@@ -724,8 +1824,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 15: Соседняя фамилия/имя
 fioRules.push({
   weight: 30,
   desc: 'Рядом есть фамилия или имя',
@@ -743,8 +1841,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 16: Частота
 fioRules.push({
   weight: 5,
   desc: 'Частота (за каждое доп. вхождение)',
@@ -752,12 +1848,8 @@ fioRules.push({
     var freq = (text.match(new RegExp(escapeRegExp(m.text), 'gi')) || []).length;
     return freq >= 2;
   },
-  multiplier: function(freq) {
-    return Math.min(3, freq-1);
-  }
+  multiplier: function(freq) { return Math.min(3, freq-1); }
 });
-
-// Правило 17: Верификация по длине и капитализации
 fioRules.push({
   weight: 5,
   desc: 'Слово с заглавной, только буквы, длина 2–30',
@@ -770,8 +1862,6 @@ fioRules.push({
     return false;
   }
 });
-
-// Правило 18: Имя или фамилия в падеже (по совпадению префикса с словарём)
 fioRules.push({
   weight: 40,
   desc: 'Слово похоже на имя/фамилию из словаря (падеж)',
@@ -797,10 +1887,86 @@ fioRules.push({
   }
 });
 
+// ========== НОВЫЕ ПРАВИЛА С МОРФОЛОГИЕЙ ==========
+if (morphEngineAvailable) {
+  fioRules.push({
+    weight: 85,
+    desc: 'MorphEngine: определена фамилия в любом падеже',
+    test: function(text, m) {
+      var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+      for (var i = 0; i < parts.length; i++) {
+        var morph = MorphEngine.detectCase(parts[i]);
+        if (morph && morph.type === 'surname') return true;
+      }
+      return false;
+    }
+  });
+  fioRules.push({
+    weight: 80,
+    desc: 'MorphEngine: определено имя в любом падеже',
+    test: function(text, m) {
+      var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+      for (var i = 0; i < parts.length; i++) {
+        var morph = MorphEngine.detectCase(parts[i]);
+        if (morph && morph.type === 'name') return true;
+      }
+      return false;
+    }
+  });
+  fioRules.push({
+    weight: 90,
+    desc: 'MorphEngine: определено отчество',
+    test: function(text, m) {
+      var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+      for (var i = 0; i < parts.length; i++) {
+        var morph = MorphEngine.detectCase(parts[i]);
+        if (morph && morph.type === 'patronymic') return true;
+      }
+      return false;
+    }
+  });
+  fioRules.push({
+    weight: 50,
+    desc: 'MorphEngine: слово определено как имя собственное',
+    test: function(text, m) {
+      var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+      for (var i = 0; i < parts.length; i++) {
+        var proper = MorphEngine.isProperNoun(parts[i], { isSentenceStart: false });
+        if (proper && proper.isProper && proper.confidence > 0.7) return true;
+      }
+      return false;
+    }
+  });
+}
+
+// Бонусы для ИП
+fioRules.push({
+  weight: 60,
+  desc: 'Одиночный инициал после маркера обращения',
+  test: function(text, m) {
+    if (!/^[А-ЯЁ]\.$/.test(m.text.trim())) return false;
+    return /(?:жалобы|жалобу|жалоба|заявления|заявление|ходатайства|иска|иске|запроса|просьбы|отношении)\s+$/i.test(text.slice(Math.max(0, m.start - 16), m.start));
+  }
+});
+fioRules.push({
+  weight: 90,
+  desc: 'ИП/предприниматель + фамилия + инициалы',
+  test: function(text, m) {
+    return /(?:^|[\s])(?:И[.]?П[.]?|индивидуальн(?:ый|ого|ому|ым|ом)\s+предпринимател(?:ь|я|ю|ем)|предпринимател(?:ь|я|ю|ем))(?:[\s]|$)/i.test(m.text) &&
+           /[А-ЯЁ]\.\s*[А-ЯЁ]?\.?/.test(m.text);
+  }
+});
+fioRules.push({
+  weight: 70,
+  desc: 'ИП/предприниматель + фамилия',
+  test: function(text, m) {
+    return /(?:^|[\s])(?:И[.]?П[.]?|индивидуальн(?:ый|ого|ому|ым|ом)\s+предпринимател(?:ь|я|ю|ем)|предпринимател(?:ь|я|ю|ем))(?:[\s]|$)/i.test(m.text);
+  }
+});
+
 // ========== ФУНКЦИЯ СКОРИНГА ==========
 function scoreCandidate(text, match) {
   var total = 0;
-  // Бонусы (+)
   for (var i = 0; i < fioRules.length; i++) {
     var rule = fioRules[i];
     if (rule.test(text, match)) {
@@ -812,7 +1978,6 @@ function scoreCandidate(text, match) {
       total += add;
     }
   }
-  // Штрафы (-)
   for (var i = 0; i < fioPenaltyRules.length; i++) {
     var rule = fioPenaltyRules[i];
     if (rule.test(text, match)) {
@@ -839,6 +2004,16 @@ var fioStopWords = new Set([
   'половина','половины','стоила','стоить','долларов','доллар','однако','учитывая',
   'материальное','положение','инвалидность','группы','группа','пенсионный','доход',
   'содержание','жилья','жильё','решить','миром','согласна','существенную','уступку',
+  'заказчика','заказчик','заказчику','заказчиком','заказчине','задание','задания','заданию','заданием',
+  'приложение','приложения','приложению','приложением','приложений','приложении',
+  'договор','договора','договору','стороны','сторон','исполнитель','исполнителя','исполнителю','акт','акта','акту',
+  'конституционного','конституционный','конституционная','конституционное','конституционные','конституционным','конституционной','конституционном',
+  'федерального','федеральный','федеральная','федеральное','федеральным','верховного','верховный','верховная','верховном',
+  'районного','районный','районная','районной','областного','областной','областная','областным','городского','городской','городского',
+  'российской','российская','российское','российский','российскую','российских','российским',
+  'федерации','федерацией','федерацию','федерация','республики','республика','республикой',
+  'конституции','конституция','конституцией','кодекса','кодекс','кодексом','процессуального',
+  'гражданского','гражданский','административного','административный','трудового','трудового','трудовой',
   'получить','тысяч','тысяча','сумма','окончательная','позволит','оформить',
   'единоличную','единоличный','собственность','суда','суд','альтернативный',
   'вариант','размен','меньшую','меньший','единовременно','выплатить','затруднительно',
@@ -846,12 +2021,16 @@ var fioStopWords = new Set([
   'меньшей','площади','площадь','например','однокомнатную','разницу','цене','цена',
   'составляющую','передаёте','остаётесь','ищете','дополнительных','средств','средство',
   'соответствии','статьёй','статья','кодекса','республики','беларусь','беларуси',
-  'признаются','признавать','равными','равный','материальное','материальный'
+  'признаются','признавать','равными','равный','материальное','материальный',
+  'управление','отдел','отделение','департамент','комитет','совет','инспекция','служба',
+  'агентство','учреждение','министерство','ведомство','дирекция','филиал','представительство',
+  'компания','корпорация','холдинг','концерн','объединение','союз','ассоциация',
+  'банк','фонд','страховая','лицензия','разрешение','свидетельство','сертификат',
+  'акт','договор','контракт','соглашение','протокол','приказ','распоряжение'
 ]);
 
 function filterFioCascade(text, matches) {
   var stopWords = getStopWords();
-  // Предварительно строим Set'ы словарей для быстрой проверки
   var surnamesSet = new Set(commonSurnames.split('|').map(function(s){ return s.toLowerCase(); }));
   var namesSet = new Set(commonNames.split('|').map(function(s){ return s.toLowerCase(); }));
   var patrSet = new Set(commonPatronymics.split('|').map(function(s){ return s.toLowerCase(); }));
@@ -862,7 +2041,13 @@ function filterFioCascade(text, matches) {
       result.push(m);
       continue;
     }
-    // Propagated-совпадения уже подтверждены через корень — не фильтруем повторно
+    if (m.type === 'fio') {
+      var __parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+      if (__parts.length === 1) {
+        var __w = __parts[0].replace(/[^а-яёА-ЯЁ]/g, '').toLowerCase();
+        if (__w.length > 1 && blacklist.has(__w)) continue;
+      }
+    }
     if (m.propagated === true) {
       result.push(m);
       continue;
@@ -873,54 +2058,65 @@ function filterFioCascade(text, matches) {
     var passed = false;
     var reason = '';
     var score = scoreCandidate(text, m);
+    // инициал после маркера обращения («жалобы Ц.») — компенсируем штрафы за краткость
+    if (m.type === 'fio' && /^[А-ЯЁ]\.$/.test(m.text.trim()) && /(?:жалобы|жалобу|жалоба|заявления|заявление|ходатайства|иска|иске|запроса|просьбы|отношении)\s+$/i.test(text.slice(Math.max(0, m.start - 16), m.start))) score += 40;
 
-    // === КАРДИНАЛЬНАЯ ПРОВЕРКА: каждое слово ФИО начинается с заглавной ===
     var candidateWords = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
     var hasLowercaseWord = false;
     for (var wi = 0; wi < candidateWords.length; wi++) {
       var w = candidateWords[wi];
-      // Инициалы (А. или А) пропускаем
       if (/^[А-ЯЁа-яё]\.?$/.test(w)) continue;
       if (/^[а-яё]/.test(w)) { hasLowercaseWord = true; break; }
     }
     if (hasLowercaseWord) {
-      passed = false;
-      reason = 'содержит строчное слово (не ФИО)';
       continue;
     }
+    var hasCapsWord = false;
+    for (var cw2 = 0; cw2 < candidateWords.length; cw2++) {
+      var w2c = candidateWords[cw2].replace(/[^а-яёА-ЯЁ]/g, '');
+      if (w2c.length >= 4 && /^[А-ЯЁ]+$/.test(w2c)) {
+        var low2 = w2c.toLowerCase();
+        var inDict2 = [commonSurnames, commonNames, commonPatronymics].some(function(dd){ return dd.toLowerCase().split('|').indexOf(low2) !== -1; });
+        if (!inDict2) { hasCapsWord = true; break; }
+      }
+    }
+    if (hasCapsWord) continue;
+    var isGeo = false;
+    (function(){
+      var gps = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 4 && /^[А-ЯЁ][а-яё]+$/.test(p); });
+      var gc = commonCities.toLowerCase().split('|');
+      for (var gi = 0; gi < gps.length; gi++) {
+        var gm = gps[gi].toLowerCase().match(/^([а-яё]+?)ск(ий|ого|ому|им|ом|ая|ое|ие|их|ым|ую|ем|ее)$/);
+        if (!gm) continue;
+        for (var gj = 0; gj < gc.length; gj++) if (gc[gj].length >= 4 && (gc[gj] === gm[1] + 'ск' || gc[gj] === gm[1])) { isGeo = true; return; }
+      }
+    })();
+    if (isGeo) continue;
 
-    // Бонус +30 для паттернов с сильными маркерами
     if (typeof m.patIdx === 'number' && m.patIdx >= 13 && m.patIdx <= 24) {
       score += 30;
     }
 
-    // Проверка встроенного стоп-листа ФИО
     var hasFioStop = false;
-    var candidateWords = m.text.split(/[\s-]+/);
     for (var sw = 0; sw < candidateWords.length; sw++) {
       var cw = candidateWords[sw].replace(/[^а-яё]/gi,'').toLowerCase();
       if (fioStopWords.has(cw)) { hasFioStop = true; break; }
     }
     if (hasFioStop) {
-      passed = false;
-      reason = 'содержит стоп-слово (не ФИО)';
       continue;
     }
 
-    // Жёсткая проверка: в ФИО должна быть хотя бы одна заглавная буква
     if (!/[А-ЯЁ]/.test(m.text)) {
-      passed = false;
-      reason = 'нет заглавных букв';
       continue;
     }
 
-    // Обязательная словарная проверка
     if (validateDict) {
       var hasDictWord = false;
-      for (var w = 0; w < candidateWords.length; w++) {
-        var word = candidateWords[w].replace(/[^а-яё]/gi,'').toLowerCase();
+      // инициал после маркера обращения («жалобы Ц.») — словарь не требуем
+      if (/^[А-ЯЁ]\.$/.test(m.text.trim()) && /(?:жалобы|жалобу|жалоба|заявления|заявление|ходатайства|иска|иске|запроса|просьбы|отношении)\s+$/i.test(text.slice(Math.max(0, m.start - 16), m.start))) hasDictWord = true;
+      for (var w2 = 0; w2 < candidateWords.length; w2++) {
+        var word = candidateWords[w2].replace(/[^а-яё]/gi,'').toLowerCase();
         if (word.length < 3) continue;
-        // Проверяем по всем словарям с учётом падежных окончаний (совпадение префикса)
         var dictSets = [surnamesSet, namesSet, patrSet];
         for (var d = 0; d < dictSets.length; d++) {
           var it = dictSets[d].values();
@@ -937,9 +2133,19 @@ function filterFioCascade(text, matches) {
         }
         if (hasDictWord) break;
       }
+      if (!hasDictWord && morphEngineAvailable && useMorphology) {
+        var morphParts = 0;
+        for (var wmd = 0; wmd < candidateWords.length; wmd++) {
+          var wraw = candidateWords[wmd].trim();
+          if (/^[А-ЯЁ]\./.test(wraw)) { morphParts++; continue; }
+          var wclean = wraw.replace(/[^а-яёА-ЯЁ]/gi, '');
+          if (wclean.length < 3) continue;
+          var wmorph = MorphEngine.detectCase(wclean);
+          if (wmorph && (wmorph.type === 'surname' || wmorph.type === 'name' || wmorph.type === 'patronymic')) morphParts++;
+        }
+        if (morphParts >= 2) hasDictWord = true;
+      }
       if (!hasDictWord) {
-        passed = false;
-        reason = 'нет слова из словаря';
         continue;
       }
     }
@@ -960,16 +2166,16 @@ function filterFioCascade(text, matches) {
   return result;
 }
 
-
 // ========== ОБЪЕДИНЕНИЕ АДРЕСОВ ==========
 function mergeAddressMatches(text, matches) {
+  matches = matches.filter(function(m) { return text.slice(m.start, m.end) === m.text; });
   if (matches.length < 2) return matches;
   matches.sort(function(a,b){ return a.start - b.start; });
   var merged = [matches[0]];
   for (var i = 1; i < matches.length; i++) {
     var last = merged[merged.length-1];
     var curr = matches[i];
-    if (curr.start - last.end <= 20) {
+    if (curr.start - last.end <= 3) {
       last.end = curr.end;
       last.text = text.slice(last.start, last.end);
     } else {
@@ -979,354 +2185,172 @@ function mergeAddressMatches(text, matches) {
   return merged;
 }
 
-// ========== ПОСТРОЕНИЕ ПАТТЕРНОВ (с маркерным правилом) ==========
-function buildPatterns() {
-  var custom = getCustomWords();
-  var s = wbStart();
-  var e = wbEnd();
-
-  var surnamesArr = commonSurnames.split('|').concat(
-    custom.filter(function(n) { return n.length > 2 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
-  );
-  var namesArr = commonNames.split('|').concat(
-    custom.filter(function(n) { return n.length > 1 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
-  );
-  var patronymicsArr = commonPatronymics.split('|');
-  var citiesArr = commonCities.split('|').concat(
-    custom.filter(function(n) { return n.length > 2 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
-  );
-  var streetsArr = commonStreets.split('|').concat(
-    custom.filter(function(n) { return n.length > 2 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
-  );
-  var regionsArr = commonRegions.split('|');
-
-  var sP = surnamesArr.map(escapeRegExp).join('|');
-  var nP = namesArr.map(escapeRegExp).join('|');
-  var pP = patronymicsArr.map(escapeRegExp).join('|') + '|' + '[А-ЯЁ][а-яё]+(?:вич|вна|ич|ын|овна|евич|ична|ьич|улы|кызы|ович|овна|евич|евна|ьевич|ьевна|иевич|иевна|еевич|еевна)(?:а|у|е|ом|ем|ах|ами|ой|ей|ы|и|о|ов|ев|ей|ям|ях|ями|ю|ём|ье|ья|ьи|ей|ьев|ьём|ьям|ьях|ьями)?';
-  var cP = citiesArr.map(escapeRegExp).join('|');
-  var stP = streetsArr.map(escapeRegExp).join('|');
-  var rP = regionsArr.map(escapeRegExp).join('|');
-
-  var fio = [];
-  var titles = '(?:г-н|г-жа|господин|госпожа|гражданин|гражданка|гр-н|гр-ка|товарищ|тов|доктор|др|профессор|проф|инженер|директор|начальник|заместитель|председатель|секретарь|консультант|агент|представитель|уполномоченный|управляющий|ректор|декан|заведующий|руководитель|исполнитель|заказчик|поставщик|покупатель|продавец|клиент|партнёр|контрагент|арендатор|наниматель|собственник|владелец|наследник|опекун|попечитель|истец|ответчик|заявитель|жалобщик|взыскатель|должник|кредитор|ип|индивидуальный предприниматель|предприниматель|уважаемый|уважаемая|дорогой|дорогая)';
-  var tP = '(?:' + titles + '[. ]+)?';
-  var spaceFlex = '[\\s-]+';
-
-  // ---- Стандартные паттерны ФИО ----
-// Титул + любая фамилия (включая нестандартные/падежные) + опциональные инициалы
-fio.push(new RegExp(s + '(?:' + titles + ')[. ]+([А-ЯЁ][а-яё]+)(?:[\s-]+[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?)?' + e, 'gi'));
-  fio.push(new RegExp(s + tP + '(' + sP + ')' + spaceFlex + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + e, 'gi'));
-  fio.push(new RegExp(s + tP + '(' + sP + ')' + spaceFlex + '(' + nP + ')' + spaceFlex + '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-  fio.push(new RegExp(s + tP + '(' + sP + ')' + spaceFlex + '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-  fio.push(new RegExp(s + tP + '(' + sP + ')' + e, 'gi'));
-  fio.push(new RegExp(s + tP + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + spaceFlex + '(' + sP + ')' + e, 'gi'));
-  fio.push(new RegExp(s + tP + '(' + nP + ')' + spaceFlex + '(' + sP + ')' + e, 'gi'));
-
-  // Имя + Отчество (2 слова, без фамилии)
-  fio.push(new RegExp(s + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + e, 'gi'));
-  // Титул + Имя + Отчество (2 слова)
-  fio.push(new RegExp(s + tP + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + e, 'gi'));
-  // Обращение + Имя + Отчество (2 слова)
-  fio.push(new RegExp(s + '(?:уважаемый|уважаемая|дорогой|дорогая)[\s]+([А-ЯЁ][а-яё]+)[\s]+([А-ЯЁ][а-яё]+)' + e, 'gi'));
-
-    // ---- Падежные паттерны с маркерами ----
-
-  var genitiveMarkers = 'ИП|индивидуальный предприниматель|в пользу|у|от|до|без|для|ради|взыскать|взыскание|ответчик|истец|должник|кредитор|заявитель|жалобщик|взыскатель|из|среди|между|возле|около|мимо|через|сквозь|вдоль|напротив|позади|впереди|сзади|справа|слева|внутри|снаружи|вне|кроме|вместо|вроде|наподобие|вследствие|по причине|благодаря|вопреки|навстречу|вслед|наперекор|согласно|по';
-  fio.push(new RegExp(s + '(?:' + genitiveMarkers + ')' + spaceFlex +
-    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + spaceFlex +
-    '(' + nP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + spaceFlex +
-    '(' + pP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + e, 'gi'));
-  fio.push(new RegExp(s + '(?:' + genitiveMarkers + ')' + spaceFlex +
-    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + spaceFlex +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-  fio.push(new RegExp(s + '(?:' + genitiveMarkers + ')' + spaceFlex +
-    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + e, 'gi'));
-
-  // ---- Инструментальный, дательный, предложный ----
-  fio.push(new RegExp(s + '(?:с|со|за|над|под|перед|между|индивидуальным предпринимателем)' + spaceFlex +
-    '(?:ИП|индивидуальным предпринимателем|предпринимателем)?' + spaceFlex +
-    '(' + sP + ')(?:ым|им|ой|ей|ом|ем)?' + spaceFlex +
-    '(' + nP + ')(?:ем|ом|ой|ей|ым|им)?' + spaceFlex +
-    '(' + pP + ')(?:ем|ом|ой|ей|ым|им)?' + e, 'gi'));
-  fio.push(new RegExp(s + '(?:с|со|за|над|под|перед|между)' + spaceFlex +
-    '(?:ИП|индивидуальным предпринимателем|предпринимателем)?' + spaceFlex +
-    '(' + sP + ')(?:ым|им|ой|ей|ом|ем)?' + spaceFlex +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-
-  fio.push(new RegExp(s + '(?:к|по|благодаря|вопреки|навстречу)' + spaceFlex +
-    '(' + sP + ')(?:у|ю|е|и)?' + spaceFlex +
-    '(' + nP + ')(?:у|ю|е|и)?' + spaceFlex +
-    '(' + pP + ')(?:у|ю|е|и)?' + e, 'gi'));
-
-  fio.push(new RegExp(s + '(?:о|об|во|при|на|в)' + spaceFlex +
-    '(' + sP + ')(?:е|и|ы)?' + spaceFlex +
-    '(' + nP + ')(?:е|и|ы)?' + spaceFlex +
-    '(' + pP + ')(?:е|и|ы)?' + e, 'gi'));
-
-  // ---- Паттерны предлог + фамилия + инициалы (падежи) ----
-  var prepSpace = '[\\s-]+';
-  // Родительный (от, до, без, для, ради, из, с, со, у, в пользу, взыскать)
-  fio.push(new RegExp(s + '(?:от|до|без|для|ради|из|с|со|у|в пользу|взыскать|взыскание)' + prepSpace +
-    '([А-ЯЁ][а-яё]+)' + prepSpace +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-  // Дательный (к, по, благодаря, вопреки, навстречу)
-  fio.push(new RegExp(s + '(?:к|по|благодаря|вопреки|навстречу)' + prepSpace +
-    '([А-ЯЁ][а-яё]+)' + prepSpace +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-  // Творительный (с, со, за, над, под, перед, между)
-  fio.push(new RegExp(s + '(?:с|со|за|над|под|перед|между)' + prepSpace +
-    '([А-ЯЁ][а-яё]+)' + prepSpace +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-  // Предложный (о, об, во, при, на, в)
-  fio.push(new RegExp(s + '(?:о|об|во|при|на|в)' + prepSpace +
-    '([А-ЯЁ][а-яё]+)' + prepSpace +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-
-
-    // Предлог + 3 слова с заглавной (для незнакомых фамилий в падеже)
-  fio.push(new RegExp(s + '(?:от|к|по|у|до|без|для|ради|в пользу|взыскать|взыскание|из|с|со|за|над|под|перед|между|о|об|во|при|на|в|среди)' + spaceFlex +
-    '([А-ЯЁ][а-яё]+)' + spaceFlex +
-    '([А-ЯЁ][а-яё]+)' + spaceFlex +
-    '([А-ЯЁ][а-яё]+)' + e, 'gi'));
-
-    // ---- Падежные маркеры ролей (включая гражданки) ----
-  var caseMarkers = 'гражданки?|гражданина?|ответчика?|истца?|заявителя?|взыскателя?|должника?|кредитора?|представителя?|уполномоченного|доверенного|опекуна|попечителя|наследника|собственника|владельца|арендатора|нанимателя|работника?|сотрудника?|руководителя?|директора?|начальника?|генерального|председателя?|секретаря?|консультанта?|агента?|поставщика?|покупателя?|продавца?|клиента?|партнёра?|контрагента?|врача?|хирурга?|терапевта?|юриста?|адвоката?|судью?|прокурора?|следователя?|эксперта?|переводчика?|нотариуса?|арбитра?|посредника?|инвалида?|проживающей|зарегистрированной|гр-ки|г-жи|госпожи|пенсионера?|ветерана?|участника?|ребёнка?|несовершеннолетнего?|потерпевшего?|обвиняемого?|осуждённого?|заключённого?|пациента?|больного?';
-  fio.push(new RegExp(s + '(?:' + caseMarkers + ')' + spaceFlex +
-    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
-    '(' + nP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
-    '(?:' + pP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + e, 'gi'));
-  fio.push(new RegExp(s + '(?:' + caseMarkers + ')' + spaceFlex +
-    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
-    '(' + nP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
-    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
-
-  // ---- НОВЫЙ ПРОСТОЙ ПАТТЕРН: маркер + три слова с заглавной (родительный падеж) ----
-  var markerWords = ['гражданки','гражданина','инвалида','проживающей','зарегистрированной','гр-ки','г-жи','госпожи','ответчика','истца','заявителя','взыскателя','должника','кредитора','представителя','уполномоченного','доверенного','опекуна','попечителя','наследника','собственника','владельца','арендатора','нанимателя','работника','сотрудника','руководителя','директора','начальника','председателя','секретаря','консультанта','агента','поставщика','покупателя','продавца','клиента','партнёра','контрагента','врача','хирурга','терапевта','юриста','адвоката','судью','прокурора','следователя','эксперта','переводчика','нотариуса','арбитра','посредника','ип','индивидуальному','индивидуальному','предпринимателю','предпринимателя'];
-  for (var idx = 0; idx < markerWords.length; idx++) {
-    var marker = markerWords[idx];
-    // Ищем маркер, затем пробел, затем три слова с заглавной (разделённые пробелами или дефисами)
-    fio.push(new RegExp(s + marker + '\\s+([А-ЯЁ][а-яё]+(?:[\\s-][А-ЯЁ][а-яё]+){2})' + e, 'gi'));
-    // Также вариант с двумя словами (если отчество опущено)
-    fio.push(new RegExp(s + marker + '\\s+([А-ЯЁ][а-яё]+(?:[\\s-][А-ЯЁ][а-яё]+){1})' + e, 'gi'));
+// ========== ГРАММАТИЧЕСКИЙ АНАЛИЗ ==========
+function isReliableGrammarFio(word) {
+  if (!morphEngineAvailable || !word) return false;
+  var clean = word.replace(/[^а-яёА-ЯЁ]/g, '');
+  if (clean.length < 3) return false;
+  var morph = MorphEngine.detectCase(clean);
+  if (!morph) return false;
+  if (morph.type === 'patronymic') return true;
+  var cw = clean.toLowerCase();
+  var dicts = [commonSurnames, commonNames];
+  for (var d = 0; d < dicts.length; d++) {
+    var arr = dicts[d].toLowerCase().split('|');
+    if (arr.indexOf(cw) !== -1) return true;
   }
-
-  // ---- УНИВЕРСАЛЬНЫЕ ПАТТЕРНЫ: 2–3 слова с заглавной (незнакомые фамилии) ----
-  // Важно: эти паттерны ловят потенциальные ФИО без словаря,
-  // но filterFioCascade + штрафы отсекут ложные ("Советский районный суд" и т.п.)
-  fio.push(new RegExp(s + '([А-ЯЁ][а-яё]+)' + spaceFlex + '([А-ЯЁ][а-яё]+)' + spaceFlex + '([А-ЯЁ][а-яё]+)' + e, 'gi'));
-  fio.push(new RegExp(s + '([А-ЯЁ][а-яё]+)' + spaceFlex + '([А-ЯЁ][а-яё]+)' + e, 'gi'));
-
-  // ---------- АДРЕСА (УЖЕСТОЧЁННЫЕ) ----------
-  var addr = [];
-  var cityShort = 'г|гор|п|пос|пгт|д|дер|с|сел|ст|стан|хут|х|сл|мкр|микр';
-  var streetShort = 'ул|улица|пр|просп|пр-т|проспект|пер|переулок|б|бул|б-р|бульвар|наб|набережная|ш|шоссе|туп|тупик|аллея|линия|проезд|тракт';
-  var houseShort = 'д|дом|кв|квартира|к|корп|корпус|стр|строение|оф|офис|комн|комната|эт|этаж|под|подъезд';
-  var cityPat = '(?:' + cityShort + ')[.]?[- ]*(' + cP + ')(?:е|у|ю|а|я|ы|и|ой|ей|ого|его|ом|ем|ам|ям|ах|ях)?';
-  var streetPat = '(?:' + streetShort + ')[.]?[- ]*(' + stP + ')';
-  var housePat = '(?:' + houseShort + ')[.]?[- ]*[:]?[- ]*([0-9]+[/-]?[0-9]*(?:[- ]*(?:' + houseShort + ')[.]?[- ]*[0-9]+)?)';
-  var regionPat = '(?:' + rP + ')';
-  var indexPat = '[0-9]{6}';
-
-  addr.push(new RegExp(s + '(' + indexPat + ')[-, ]*' + regionPat + '[-, ]*' + cityPat + '(?:[-, ]*' + streetPat + ')?(?:[-, ]*' + housePat + ')?' + e, 'gi'));
-  addr.push(new RegExp(s + regionPat + '[-, ]*' + cityPat + '(?:[-, ]*' + streetPat + ')?(?:[-, ]*' + housePat + ')?' + e, 'gi'));
-  addr.push(new RegExp(s + cityPat + '(?:[-, ]*' + streetPat + ')?(?:[-, ]*' + housePat + ')?' + e, 'gi'));
-  addr.push(new RegExp(s + streetPat + '(?:[-, ]*' + housePat + ')?' + e, 'gi'));
-  addr.push(new RegExp(s + housePat + e, 'gi'));
-  addr.push(new RegExp(s + '(' + indexPat + ')' + e, 'g'));
-
-  // ---- Фразы "по адресу" (ограничение длины 35) ----
-  var addressPhrases = [
-    'проживающ(?:ий|ая|ие|его|ей|их|ую|им|ей)? по адресу',
-    'зарегистрирован(?:ный|ная|ные|ного|ной|ных|ным|ной|ными|ном|ной|ных)? по адресу',
-    'место жительства', 'адрес регистрации', 'адрес места жительства',
-    'почтовый адрес', 'фактический адрес', 'юридический адрес',
-    'жилплощадь', 'местонахождение', 'место пребывания', 'адрес проживания',
-    'адрес постоянной регистрации', 'адрес временной регистрации'
-  ];
-  for (var p = 0; p < addressPhrases.length; p++) {
-    var phrase = addressPhrases[p];
-    addr.push(new RegExp(s + phrase + '[: ]*([^,;.\\n]{5,50})' + e, 'gi'));
-  }
-
-  // ---- Числа после улицы/города (только если есть маркер) ----
-  addr.push(new RegExp(s + '(?:' + streetShort + '|' + cityShort + ')[^,;.\\n]*[, ]+([0-9]+(?:[, ]+[0-9]+)?)' + e, 'gi'));
-
-  // ---------- ОСТАЛЬНЫЕ ТИПЫ (без изменений) ----------
-  var idDoc = [
-    /(?<![0-9])([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})(?![0-9])/g,
-    /(?<![0-9])([0-9]{4}[- ]?[0-9]{6})(?![0-9])/g,
-    /(?<![0-9])([0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{2})(?![0-9])/g,
-    /(?<![0-9])([0-9]{10,12})(?![0-9])/g,
-    /(?<![0-9])([0-9]{13})(?![0-9])/g,
-    /(?<![0-9])([0-9]{15})(?![0-9])/g,
-    /(?<![0-9])([0-9]{9})(?![0-9])/g,
-    /паспорт[- ]*(?:РФ|России|российский)?[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
-    /серия[- ]*([0-9]{2}[- ]?[0-9]{2})[- ]*номер[- ]*([0-9]{6})/gi,
-    /водительск(?:ое|ие|их)?[- ]*(?:удостоверение|права|прав)[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
-    /СТС[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
-    /ПТС[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
-    /ИНН[- ]*[:]?[- ]*([0-9]{10,12})/gi,
-    /СНИЛС[- ]*[:]?[- ]*([0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{2})/gi,
-    /ОГРН[- ]*[:]?[- ]*([0-9]{13})/gi,
-    /ОГРНИП[- ]*[:]?[- ]*([0-9]{15})/gi,
-    /КПП[- ]*[:]?[- ]*([0-9]{9})/gi
-  ];
-
-  var date = [];
-  var dateCtx = '(?:дата[- ]*рождения|д[-. ]*р[-. ]*|родился|родилась|род[-. ]*|дата[- ]*рожд[-. ]*|др[-. ]*|дата рожд|дата рождения|дата рожд|дата выдачи|действительно до|срок действия|выдан|действителен до)';
-  date.push(new RegExp(s + dateCtx + '[: ]*([0-9]{1,2}[./-][0-9]{1,2}[./-](?:19|20)[0-9]{2})' + e, 'gi'));
-  date.push(new RegExp(s + dateCtx + '[: ]*([0-9]{1,2}[- ]+(?:' + monthsFull + ')[- ]+(?:19|20)[0-9]{2}(?:[- ]*г(?:ода)?)?)' + e, 'gi'));
-  date.push(new RegExp(s + '([0-9]{1,2}[./-][0-9]{1,2}[./-](?:19|20)[0-9]{2})' + e, 'g'));
-  date.push(new RegExp(s + '([0-9]{1,2}[- ]+(?:' + monthsFull + '|' + monthsShort + ')[- ]+(?:19|20)[0-9]{2}(?:[- ]*г(?:ода?)?)?)' + e, 'gi'));
-  date.push(new RegExp(s + '((?:19|20)[0-9]{2}[-/][0-9]{1,2}[-/][0-9]{1,2})' + e, 'g'));
-  date.push(new RegExp(s + '([0-9]{4})[- ]*(?:года|год)[- ]*рождения' + e, 'gi'));
-  date.push(new RegExp(s + 'рождения[- ]*([0-9]{4})[- ]*года?' + e, 'gi'));
-
-  var phone = [
-    /(?<![0-9])((?:8|7)[- ]?[(]?[0-9]{3}[)]?[- ]?[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{2})(?![0-9])/g,
-    /(?<![0-9])([+][0-9]{1,3}[- ]?[0-9]{1,4}[- ]?[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{2})(?![0-9])/g,
-    /(?<![0-9])([+][0-9]{1,3}[- ]?[(]?[0-9]{1,4}[)]?[- ]?[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{2})(?![0-9])/g,
-    /(?<![0-9])([0-9]{3}[- ][0-9]{2}[- ][0-9]{2})(?![0-9])/g
-  ];
-
-  var email = [/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,})/g];
-
-  var card = [
-    /(?<![0-9])((?:[0-9]{4}[- ]?){3}[0-9]{4})(?![0-9])/g,
-    /(?<![0-9])([0-9]{4}[- ]?[0-9]{6}[- ]?[0-9]{5})(?![0-9])/g,
-    /CVV[- ]*[:]?[- ]*[0-9]{3}/gi,
-    /CVC[- ]*[:]?[- ]*[0-9]{3}/gi,
-    /(?<![0-9])([0-9]{2}\/[0-9]{2,4})(?![0-9])/g
-  ];
-
-  var ipAddr = [
-    /(?<![0-9])((?:[0-9]{1,3}[.]){3}[0-9]{1,3})(?![0-9])/g,
-    /([0-9a-fA-F:]{2,39})/g
-  ];
-
-  var urlPat = [
-    /(https?:\/\/[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}(?:\/[a-zA-Z0-9._~:\/?#\]@!$&'()*+,;=-]*)?)/g,
-    /(www[.][a-zA-Z0-9.-]+[.][a-zA-Z]{2,})/g,
-    /([a-zA-Z0-9.-]+[.](?:ru|com|org|net|info|biz|pro|name|aero|asia|cat|coop|jobs|mobi|museum|post|tel|travel|xxx|edu|gov|int|mil|test|local|moscow|spb|москва|онлайн|сайт|рф|укр|бел|каз)(?:\/[a-zA-Z0-9._~:\/?#\]@!$&'()*+,;=-]*)?)/gi
-  ];
-
-  var vehicle = [
-    /[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}/g,
-    /[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{3}[0-9]{2,3}/g,
-    /[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{2}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}/g
-  ];
-
-  var moneyPat = [
-    /(?<![0-9])([0-9]{1,3}(?:[ ]?[0-9]{3})*[.,][0-9]{2})(?:[- ]*(?:руб|₽|RUB|USD|[$]|EUR|€|GBP|£|JPY|¥|CNY|CHF|CAD|AUD))(?![a-zA-Zа-яёА-ЯЁ0-9])/gi,
-    /(?<![0-9])([0-9]+(?:[ ]?[0-9]{3})*)(?:[- ]*(?:руб|₽|RUB|USD|[$]|EUR|€|GBP|£|JPY|¥|CNY|CHF|CAD|AUD))(?![a-zA-Zа-яёА-ЯЁ0-9])/gi,
-    /(?<![0-9])([0-9]{1,3}(?:[ ]?[0-9]{3})*[.,][0-9]{2})(?![a-zA-Zа-яёА-ЯЁ0-9])/g
-  ];
-
-  // ---------- ЮРИДИЧЕСКИЕ ЛИЦА ----------
-  var company = [
-    new RegExp(s + "(?:ООО|ОАО|АО|ЗАО|ПАО|ТОО|ЧУП|ИЧУП|СООО|ГУП|МУП|ФГУП|ОДО|ОО|КООП|СП|ТД|НП|АНО|Фонд)[\s]*[\"«\']?([А-ЯЁA-Z][^\"»\'\n]{1,60})[\"»\']?" + e, "gi"),
-    new RegExp(s + "(?:ООО|ОАО|АО|ЗАО|ПАО|ТОО|ЧУП|ИЧУП|СООО|ГУП|МУП|ФГУП|ОДО|ОО|КООП|СП|ТД|НП|АНО|Фонд)[\s]+([А-ЯЁA-Z][а-яёa-zA-Z\s\-]{1,60})" + e, "gi"),
-    new RegExp(s + "(?:ООО|ОАО|АО|ЗАО|ПАО|ТОО|ЧУП|ИЧУП|СООО|ГУП|МУП|ФГУП|ОДО|ОО|КООП|СП|ТД|НП|АНО|Фонд)[\s]*[\"«\']([^\"»\'\n]{1,60})[\"»\']" + e, "gi")
-  ];
-
-  return {
-    fio: fio,
-    address: addr,
-    phone: phone,
-    email: email,
-    id: idDoc,
-    card: card,
-    date: date,
-    ip: ipAddr,
-    url: urlPat,
-    vehicle: vehicle,
-    money: moneyPat,
-    company: company
-  };
+  return false;
 }
 
-// ========== ПОИСК СОВПАДЕНИЙ (с фильтром адресов) ==========
-function findAllMatches(text, patterns, type) {
-  var stopWords = getStopWords();
-  var matches = [];
-  var addrMarkers = ['ул','улица','пр','просп','проспект','пер','переулок','б','бул','бульвар','наб','набережная','ш','шоссе','туп','тупик','аллея','линия','проезд','тракт','г','гор','город','п','пос','посёлок','пгт','дер','деревня','с','село','ст','станция','хут','хутор','мкр','микрорайон','д','дом','кв','квартира','к','корп','корпус','стр','строение','оф','офис','комн','комната','эт','этаж','под','подъезд'];
-  var badWords = ['УЗ','больница','центральная','районная','областная','городская','районная','учреждение','диспансер','поликлиника','стационар','отделение','кабинет','лаборатория','аптека','санаторий','профилакторий'];
+function analyzeWithGrammar(text) {
+  if (!grammarAnalyzerAvailable || !useGrammar) return [];
+  try {
+    var result = GrammarAnalyzer.analyzeText(text);
+    lastGrammarResult = result;
+    var matches = [];
 
-  for (var i = 0; i < patterns.length; i++) {
-    var pat = patterns[i];
-    var flags = (pat.global ? 'g' : '') + (pat.ignoreCase ? 'i' : '') + (pat.multiline ? 'm' : '');
-    var regex = new RegExp(pat.source, flags.replace('g', '') + 'g');
-    var m;
-    while ((m = regex.exec(text)) !== null) {
-      if (m[0].length < 2) continue;
-      var lower = m[0].toLowerCase();
-      if (stopWords.indexOf(lower) !== -1 && !/[0-9]/.test(m[0])) continue;
+    // Извлекаем ФИО из грамматических конструкций
+    for (var i = 0; i < result.sentences.length; i++) {
+      var sent = result.sentences[i];
 
-      if (type === 'address') {
-        var hasDigit = /[0-9]/.test(m[0]);
-        var hasMarker = false;
-        for (var j = 0; j < addrMarkers.length; j++) {
-          if (lower.indexOf(addrMarkers[j]) !== -1) { hasMarker = true; break; }
+      // ФИО-конструкции (маркер + ФИО)
+      for (var j = 0; j < sent.fioConstructions.length; j++) {
+        var constr = sent.fioConstructions[j];
+        for (var k = 0; k < constr.fioWords.length; k++) {
+          var fw = constr.fioWords[k];
+          if (fw.word && fw.word.start !== undefined) {
+            if (fw.morph && fw.morph.type === 'initial') {
+              var hasReliableNeighbor = false;
+              for (var q = 0; q < constr.fioWords.length; q++) {
+                if (q !== k && constr.fioWords[q].word && isReliableGrammarFio(constr.fioWords[q].word.word)) { hasReliableNeighbor = true; break; }
+              }
+              if (!hasReliableNeighbor) continue;
+            } else if (!isReliableGrammarFio(fw.word.word)) continue;
+            matches.push({
+              start: fw.word.start,
+              end: fw.word.end,
+              text: fw.word.word,
+              type: 'fio',
+              score: 95,
+              reason: 'GrammarAnalyzer: ' + constr.type,
+              grammarSource: true
+            });
+          }
         }
-        if (!hasDigit && !hasMarker) continue;
-        var hasBad = false;
-        for (var b = 0; b < badWords.length; b++) {
-          if (lower.indexOf(badWords[b].toLowerCase()) !== -1) { hasBad = true; break; }
-        }
-        if (hasBad) continue;
-        if (m[0].length > 35) continue;
       }
 
-      matches.push({ start: m.index, end: m.index + m[0].length, text: m[0], patIdx: i });
-      if (m.index === regex.lastIndex) regex.lastIndex++;
+      // Адресные конструкции
+      for (var j = 0; j < sent.addressConstructions.length; j++) {
+        var constr = sent.addressConstructions[j];
+        for (var k = 0; k < constr.addressWords.length; k++) {
+          var aw = constr.addressWords[k];
+          var token = null;
+          if (aw.word && typeof aw.word === 'object' && aw.word.start !== undefined) {
+            token = aw.word;
+          } else if (aw.start !== undefined) {
+            token = aw;
+          }
+          if (token) {
+            matches.push({
+              start: token.start,
+              end: token.end,
+              text: token.word,
+              type: 'address',
+              score: 90,
+              reason: 'GrammarAnalyzer: ' + constr.type,
+              grammarSource: true
+            });
+          }
+        }
+      }
+
+      // Имена собственные с высокой уверенностью
+      for (var j = 0; j < sent.words.length; j++) {
+        var w = sent.words[j];
+        if (w.analysis && w.analysis.isProper && w.analysis.confidence > 0.8) {
+          var type = 'fio';
+          if (w.analysis.morph) {
+            if (w.analysis.morph.type === 'city' || w.analysis.morph.type === 'street') type = 'address';
+          }
+          if (type === 'fio' && !isReliableGrammarFio(w.word)) continue;
+          // Проверяем, не добавили ли уже
+          var already = false;
+          for (var k = 0; k < matches.length; k++) {
+            if (matches[k].start === w.start) { already = true; break; }
+          }
+          if (!already) {
+            matches.push({
+              start: w.start,
+              end: w.end,
+              text: w.word,
+              type: type,
+              score: Math.round(w.analysis.confidence * 100),
+              reason: 'GrammarAnalyzer: ' + w.analysis.reason,
+              grammarSource: true
+            });
+          }
+        }
+      }
+    }
+
+    return matches;
+  } catch (e) {
+    console.error('GrammarAnalyzer error:', e);
+    return [];
+  }
+}
+
+// ========== МОРФОЛОГИЧЕСКИЙ АНАЛИЗ КАНДИДАТОВ ==========
+function analyzeWithMorphology(matches, text) {
+  if (!morphEngineAvailable || !useMorphology) return matches;
+
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i];
+    if (m.type !== 'fio') continue;
+
+    var parts = m.text.split(/[\s-]+/).filter(function(p){ return p.length > 0; });
+    var morphScore = 0;
+    var morphReasons = [];
+
+    for (var j = 0; j < parts.length; j++) {
+      var morph = MorphEngine.detectCase(parts[j]);
+      if (morph) {
+        if (morph.type === 'surname') { morphScore += 25; morphReasons.push('фамилия(' + morph.case + ')'); }
+        if (morph.type === 'name') { morphScore += 20; morphReasons.push('имя(' + morph.case + ')'); }
+        if (morph.type === 'patronymic') { morphScore += 30; morphReasons.push('отчество'); }
+      }
+
+      var proper = MorphEngine.isProperNoun(parts[j], { isSentenceStart: false });
+      if (proper && proper.isProper) {
+        morphScore += Math.round(proper.confidence * 20);
+        morphReasons.push(proper.reason);
+      }
+    }
+
+    if (morphScore > 0) {
+      m.score = Math.min(100, (m.score || 0) + morphScore);
+      m.reason = (m.reason || '') + ' [Morph+' + morphScore + ': ' + morphReasons.join(',') + ']';
     }
   }
-  if (type === 'address' && matches.length > 1) {
-    matches = mergeAddressMatches(text, matches);
-  }
+
   return matches;
 }
 
-// ========== УДАЛЕНИЕ ПЕРЕКРЫТИЙ (с приоритетом FIO) ==========
-function removeOverlapping(matches) {
-  matches.sort(function(a, b) {
-    var aType = a.type === 'fio' ? 0 : 1;
-    var bType = b.type === 'fio' ? 0 : 1;
-    if (aType !== bType) return aType - bType;
-    return b.text.length - a.text.length || a.start - b.start;
-  });
-  var result = [];
-  var covered = new Set();
-  for (var i = 0; i < matches.length; i++) {
-    var m = matches[i];
-    var overlap = false;
-    for (var j = m.start; j < m.end; j++) {
-      if (covered.has(j)) { overlap = true; break; }
-    }
-    if (!overlap) {
-      for (var k = m.start; k < m.end; k++) covered.add(k);
-      result.push(m);
-    }
-  }
-  result.sort(function(a,b){ return a.start - b.start; });
-  return result;
-}
-
-// ========== РАСПРОСТРАНЕНИЕ ФИО ==========
-function propagateFio(text, confirmedFioMatches) {
+// ========== РАСПРОСТРАНЕНИЕ ФИО С УЧЁТОМ ПАДЕЖЕЙ ==========
+function propagateFioWithCases(text, confirmedFioMatches) {
   var components = new Set();
   var surnames = new Set();
   var names = new Set();
   var patronymics = new Set();
   var initPatterns = [];
+
   for (var i = 0; i < confirmedFioMatches.length; i++) {
     var m = confirmedFioMatches[i];
     var parts = m.text.split(/[\s-]+/);
     for (var j = 0; j < parts.length; j++) {
       var clean = parts[j].replace(/[.,]/g,'').trim();
-      if (clean.length > 2) components.add(clean.toLowerCase());
+      if (clean.length >= 4 && /^[А-ЯЁ]/.test(clean) && !blacklist.has(clean.toLowerCase())) components.add(clean.toLowerCase());
     }
-    // Классифицируем части по позиции
     if (parts.length >= 3) {
       surnames.add(parts[0].replace(/[.,]/g,'').trim().toLowerCase());
       names.add(parts[1].replace(/[.,]/g,'').trim().toLowerCase());
@@ -1335,7 +2359,8 @@ function propagateFio(text, confirmedFioMatches) {
       surnames.add(parts[0].replace(/[.,]/g,'').trim().toLowerCase());
       names.add(parts[1].replace(/[.,]/g,'').trim().toLowerCase());
     }
-    // Генерируем паттерны для поиска инициалов (Савельев С.А. → Савельев[аеуойяи]?\s+С\.\s*А\.?)
+
+    // Инициалы
     var surname = '';
     var initials = [];
     for (var j2 = 0; j2 < parts.length; j2++) {
@@ -1351,15 +2376,16 @@ function propagateFio(text, confirmedFioMatches) {
       var sBase = surname.replace(/[аеёиоуыэюя]$/, '');
       var sPat = sBase + '[аеёиоуыэюя]?';
       var initStr = initials.map(function(c){ return c + '\\.[\\s]*'; }).join('');
-      // Фамилия + инициалы
       initPatterns.push(sPat + '[\\s]+' + initStr);
-      // Инициалы + Фамилия
       initPatterns.push(initStr + sPat);
     }
   }
+
   if (components.size === 0) return [];
+
   var newMatches = [];
-  // 1. Ищем отдельные компоненты
+
+  // Распространение по компонентам
   var regex = new RegExp('(?<![а-яёА-ЯЁ])(' + (function(){var arr=[];components.forEach(function(v){arr.push(v);});return arr.map(escapeRegExp).join('|');})() + ')(?![а-яёА-ЯЁ])', 'gi');
   var m;
   while ((m = regex.exec(text)) !== null) {
@@ -1377,7 +2403,8 @@ function propagateFio(text, confirmedFioMatches) {
       });
     }
   }
-  // 2. Генерируем комбинации из найденных компонентов и ищем их как целые фразы
+
+  // Распространение по комбинациям
   var sArr = []; surnames.forEach(function(v){ sArr.push(v); });
   var nArr = []; names.forEach(function(v){ nArr.push(v); });
   var pArr = []; patronymics.forEach(function(v){ pArr.push(v); });
@@ -1416,7 +2443,39 @@ function propagateFio(text, confirmedFioMatches) {
       }
     }
   }
-  // 3. Ищем варианты с инициалами (Савельев С.А., С.А. Савельев и т.п.)
+
+  // Распространение на одиночный инициал подтверждённого лица («Ц.»)
+  var firstLetters = new Set();
+  for (var fl = 0; fl < confirmedFioMatches.length; fl++) {
+    var flParts = confirmedFioMatches[fl].text.split(/[\s-]+/);
+    for (var fp = 0; fp < flParts.length; fp++) {
+      var flw = flParts[fp].replace(/[^а-яёА-ЯЁ]/g, '');
+      if ((flw.length >= 4 || confirmedFioMatches[fl].text.length <= 5) && /^[А-ЯЁ]/.test(flw)) firstLetters.add(flw.charAt(0).toLowerCase());
+    }
+  }
+  firstLetters.forEach(function(L) {
+    if (blacklist.has(L)) return;
+    var slRe = new RegExp('(?<![А-ЯЁа-яё])' + L + '\\.(?=\\s)', 'g');
+    var slM;
+    while ((slM = slRe.exec(text)) !== null) {
+      var overlapSL = false;
+      var allSL = confirmedFioMatches.concat(newMatches);
+      for (var si = 0; si < allSL.length; si++) {
+        var exSL = allSL[si];
+        if (slM.index >= exSL.start && slM.index < exSL.end) { overlapSL = true; break; }
+      }
+      if (overlapSL) continue;
+      var beforeSL = text.slice(Math.max(0, slM.index - 3), slM.index).toLowerCase();
+      if (/[пчст]\.?$/.test(beforeSL)) continue; // п. 2, ч. 1, ст. — не инициалы
+      newMatches.push({
+        start: slM.index, end: slM.index + 2, text: slM[0],
+        type: 'fio', patIdx: -1, score: 90, propagated: true,
+        reason: 'инициал подтверждённого лица'
+      });
+    }
+  });
+
+  // Распространение по инициалам
   if (initPatterns.length > 0) {
     var initRegex = new RegExp('(?<![а-яёА-ЯЁ])(' + initPatterns.join('|') + ')(?![а-яёА-ЯЁ])', 'gi');
     var im;
@@ -1443,63 +2502,87 @@ function propagateFio(text, confirmedFioMatches) {
     }
   }
 
-  // ---- ШАГ 5: Поиск склонённых форм по корню (падежи) ----
-  // Если найдено "Щербатюк", маскируем также "Щербатюку", "Щербатюка", "Щербатюком" и т.п.
-  var rootWords = new Set();
-  for (var ci = 0; ci < confirmedFioMatches.length; ci++) {
-    var parts = confirmedFioMatches[ci].text.split(/[\s-]+/);
-    for (var pi = 0; pi < parts.length; pi++) {
-      var w = parts[pi].replace(/[.,]/g, '').trim();
-      if (w.length >= 3 && /^[А-ЯЁ]/.test(w)) {
-        rootWords.add(w);
+  // Распространение по корням с учётом падежей (НОВОЕ!)
+  if (morphEngineAvailable) {
+    var rootWords = new Set();
+    for (var ci = 0; ci < confirmedFioMatches.length; ci++) {
+      var parts = confirmedFioMatches[ci].text.split(/[\s-]+/);
+      for (var pi = 0; pi < parts.length; pi++) {
+        var w = parts[pi].replace(/[.,]/g, '').trim();
+        if (w.length >= 3 && /^[А-ЯЁ]/.test(w)) {
+          var morph = MorphEngine.detectCase(w);
+          if (morph && morph.base) {
+            rootWords.add({ base: morph.base, type: morph.type, gender: morph.gender, lemma: MorphEngine.lemmatize(w, morph).toLowerCase() });
+          } else {
+            rootWords.add({ base: w.toLowerCase(), type: 'unknown', gender: null, lemma: null });
+          }
+        }
       }
     }
-  }
-  var rootArr = [];
-  rootWords.forEach(function(v){ rootArr.push(v); });
-  for (var ri = 0; ri < rootArr.length; ri++) {
-    var base = rootArr[ri];
-    var prefixLen = Math.min(base.length, 5);
-    var prefix = base.substring(0, prefixLen);
-    // Regex: слово начинается с префикса, длина base±3, только кириллица, заглавная
-    var rootRe = new RegExp('(?<![а-яёА-ЯЁ])(' + escapeRegExp(prefix) + '[а-яё]{0,5})(?![а-яёА-ЯЁ])', 'gi');
-    var rm;
-    while ((rm = rootRe.exec(text)) !== null) {
-      var foundWord = rm[0];
-      // Проверки:
-      if (!/^[А-ЯЁ]/.test(foundWord)) continue;          // только с заглавной
-      if (foundWord.length < 3) continue;                // минимум 3 символа
-      if (Math.abs(foundWord.length - base.length) > 3) continue; // ±3 от базы
-      // Не перекрывается с уже найденными
-      var overlap = false;
-      var allExisting = confirmedFioMatches.concat(newMatches);
-      for (var ei = 0; ei < allExisting.length; ei++) {
-        var ex = allExisting[ei];
-        if (rm.index >= ex.start && rm.index < ex.end) { overlap = true; break; }
-      }
-      if (overlap) continue;
-      // Не стоп-слово
-      var stopWords = getStopWords();
-      if (stopWords.indexOf(foundWord.toLowerCase()) !== -1) continue;
-      // Не в blacklist
-      var cleanW = foundWord.replace(/[^а-яё]/gi, '').toLowerCase();
-      if (cleanW.length > 2 && blacklist.has(cleanW)) continue;
-      // Не дубль в newMatches
-      var already = false;
-      for (var ni = 0; ni < newMatches.length; ni++) {
-        if (newMatches[ni].start === rm.index) { already = true; break; }
-      }
-      if (!already) {
-        newMatches.push({
-          start: rm.index,
-          end: rm.index + foundWord.length,
-          text: foundWord,
-          type: 'fio',
-          patIdx: -1,
-          score: 90,
-          propagated: true,
-          reason: 'форма по корню «' + base + '»'
-        });
+
+    var rootArr = [];
+    rootWords.forEach(function(v){ rootArr.push(v); });
+
+    for (var ri = 0; ri < rootArr.length; ri++) {
+      var rootInfo = rootArr[ri];
+      var base = rootInfo.base;
+      var prefixLen = Math.min(base.length, 6);
+      var prefix = base.substring(0, prefixLen);
+
+      // Ищем все формы по корню
+      var rootRe = new RegExp('(?<![а-яёА-ЯЁ])(' + escapeRegExp(prefix) + '[а-яё]{0,10})(?![а-яёА-ЯЁ])', 'gi');
+      var rm;
+      while ((rm = rootRe.exec(text)) !== null) {
+        var foundWord = rm[0];
+        if (!/^[А-ЯЁ]/.test(foundWord)) continue;
+        if (/^[А-ЯЁ]+$/.test(foundWord)) continue; // КАПС не трогаем
+        if (foundWord.length < 3) continue;
+        if (Math.abs(foundWord.length - base.length) > 6) continue;
+
+        // Проверяем через MorphEngine
+        var foundMorph = MorphEngine.detectCase(foundWord);
+        if (foundMorph && foundMorph.type === rootInfo.type) {
+          // Тип совпадает (фамилия к фамилии, имя к имени)
+        } else if (foundMorph && rootInfo.type === 'unknown') {
+          // Тоже подходит
+        } else {
+          continue;
+        }
+        // Точная проверка по лемме: маскируем только формы ТОГО ЖЕ слова
+        if (rootInfo.lemma) {
+          var foundLemma = MorphEngine.lemmatize(foundWord, foundMorph).toLowerCase();
+          if (foundLemma !== rootInfo.lemma) continue;
+        }
+
+        var overlap = false;
+        var allExisting = confirmedFioMatches.concat(newMatches);
+        for (var ei = 0; ei < allExisting.length; ei++) {
+          var ex = allExisting[ei];
+          if (rm.index >= ex.start && rm.index < ex.end) { overlap = true; break; }
+        }
+        if (overlap) continue;
+
+        var stopWords = getStopWords();
+        if (stopWords.indexOf(foundWord.toLowerCase()) !== -1) continue;
+        var cleanW = foundWord.replace(/[^а-яё]/gi, '').toLowerCase();
+        if (cleanW.length > 2 && blacklist.has(cleanW)) continue;
+
+        var already = false;
+        for (var ni = 0; ni < newMatches.length; ni++) {
+          if (newMatches[ni].start === rm.index) { already = true; break; }
+        }
+        if (!already) {
+          newMatches.push({
+            start: rm.index,
+            end: rm.index + foundWord.length,
+            text: foundWord,
+            type: 'fio',
+            patIdx: -1,
+            score: 90,
+            propagated: true,
+            reason: 'форма по корню «' + base + '» (' + (foundMorph ? foundMorph.case : '?') + ')'
+          });
+        }
       }
     }
   }
@@ -1508,11 +2591,6 @@ function propagateFio(text, confirmedFioMatches) {
 }
 
 // ========== ДВОЙНОЕ ПОДТВЕРЖДЕНИЕ ДЛЯ ЦИФР ==========
-function cloneObj(obj) {
-  var clone = {};
-  for (var key in obj) { if (obj.hasOwnProperty(key)) clone[key] = obj[key]; }
-  return clone;
-}
 function deduplicateNumericMatches(text, matches) {
   var numericTypes = ['phone','id','date'];
   var byType = {};
@@ -1548,318 +2626,1163 @@ function deduplicateNumericMatches(text, matches) {
   return result;
 }
 
-// ========== ОСНОВНАЯ ФУНКЦИЯ АНОНИМИЗАЦИИ ==========
-function anonymize() {
-  var text = sourceText.value;
-  if (!text.trim()) { alert('Вставьте текст для обработки'); return; }
+// ========== ПОСТРОЕНИЕ ПАТТЕРНОВ ==========
+function buildPatterns() {
+  var custom = getCustomWords();
+  var s = wbStart();
+  var e = wbEnd();
 
-  var activeTypes = [];
-  var chips = document.querySelectorAll('#typeChips .chip');
-  for (var i = 0; i < chips.length; i++) {
-    var cb = chips[i].querySelector('input');
-    if (cb.checked) activeTypes.push(chips[i].dataset.type);
+  var surnamesArr = commonSurnames.split('|').concat(
+    custom.filter(function(n) { return n.length > 2 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
+  );
+  var namesArr = commonNames.split('|').concat(
+    custom.filter(function(n) { return n.length > 1 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
+  );
+  var patronymicsArr = commonPatronymics.split('|');
+  var citiesArr = commonCities.split('|').concat(
+    custom.filter(function(n) { return n.length > 2 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
+  );
+  var streetsArr = commonStreets.split('|').concat(
+    custom.filter(function(n) { return n.length > 2 && /^[А-ЯЁ][а-яё-]+$/.test(n); })
+  );
+  var regionsArr = commonRegions.split('|');
+
+  var sP = surnamesArr.map(escapeRegExp).join('|');
+  var nP = namesArr.map(escapeRegExp).join('|');
+  var pP = patronymicsArr.map(escapeRegExp).join('|') + '|' + '[А-ЯЁ][а-яё]+(?:вич|вна|ич|ын|овна|евич|ична|ьич|улы|кызы|ович|овна|евич|евна|ьевич|ьевна|иевич|иевна|еевич|еевна)(?:а|у|е|ом|ем|ах|ами|ой|ей|ы|и|о|ов|ев|ей|ям|ях|ями|ю|ём|ье|ья|ьи|ей|ьев|ьём|ьям|ьях|ьями)?';
+  var cP = citiesArr.map(escapeRegExp).join('|');
+  var stP = streetsArr.map(escapeRegExp).join('|');
+  var rP = regionsArr.map(escapeRegExp).join('|');
+
+  var fio = [];
+  var titles = '(?:г-н|г-жа|господин|госпожа|гражданин|гражданка|гр-н|гр-ка|товарищ|тов|доктор|др|профессор|проф|инженер|директор|начальник|заместитель|председатель|секретарь|консультант|агент|представитель|уполномоченный|управляющий|ректор|декан|заведующий|руководитель|исполнитель|заказчик|поставщик|покупатель|продавец|клиент|партнёр|контрагент|арендатор|наниматель|собственник|владелец|наследник|опекун|попечитель|истец|ответчик|заявитель|жалобщик|взыскатель|должник|кредитор|ип|индивидуальный предприниматель|предприниматель|уважаемый|уважаемая|дорогой|дорогая)';
+  var tP = '(?:' + titles + '[. ]+)?';
+  var spaceFlex = '[\\s-]+';
+
+  // НОВЫЕ ПАТТЕРНЫ ДЛЯ ИП (с учётом падежей)
+  fio.push(new RegExp(s + '(?:И[.]?П[.]?|индивидуальн(?:ый|ого|ому|ым|ом)\s+предпринимател(?:ь|я|ю|ем)|предпринимател(?:ь|я|ю|ем))\\s+([А-ЯЁ][а-яё]+)(?:[а-яё]+)?\\s+([А-ЯЁ]\\.\\s*[А-ЯЁ]?\\.?)' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:И[.]?П[.]?|индивидуальн(?:ый|ого|ому|ым|ом)\s+предпринимател(?:ь|я|ю|ем)|предпринимател(?:ь|я|ю|ем))\\s+([А-ЯЁ][а-яё]+)(?:[а-яё]+)?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:ИП\\.|индивидуальный предприниматель|предприниматель)\\s+([А-ЯЁ][а-яё]+)(?:[а-яё]+)?\\s+([А-ЯЁ]\\.\\s*[А-ЯЁ]?\\.?)' + e, 'gi'));
+
+  fio.push(new RegExp(s + '(?:' + titles + ')[. ]+([А-ЯЁ][а-яё]+)(?:[\\s-]+[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?)?' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + sP + ')' + spaceFlex + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + sP + ')' + spaceFlex + '(' + nP + ')' + spaceFlex + '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + sP + ')' + spaceFlex + '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + sP + ')' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + spaceFlex + '(' + sP + ')' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + nP + ')' + spaceFlex + '(' + sP + ')' + e, 'gi'));
+  fio.push(new RegExp(s + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + e, 'gi'));
+  fio.push(new RegExp(s + tP + '(' + nP + ')' + spaceFlex + '(' + pP + ')' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:уважаемый|уважаемая|дорогой|дорогая)[\\s]+([А-ЯЁ][а-яё]+)[\\s]+([А-ЯЁ][а-яё]+)' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:[А-ЯЁ][а-яё]+(?:енко|ько|ко|ук|ку|ский|цкий|ов|ев|ин|ын|ой|ий|ец|енок|юк|чук|вич|ич|овым|евым|иным|ским|цким|овой|евой|иной|ской|цкой|ову|еву|ину|ыну|ове|еве|ине))' + spaceFlex + '(?:[А-ЯЁ]\\.[ ]*[А-ЯЁ]?\\.?|[А-ЯЁ][а-яё]+)' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:[А-ЯЁ][а-яё]+(?:енко|ько|ко|ук|ку|ский|цкий|ов|ев|ин|ын|ой|ий|ец|енок|юк|чук|вич|ич|овым|евым|иным|ским|цким|овой|евой|иной|ской|цкой|ову|еву|ину|ыну|ове|еве|ине))' + spaceFlex + '[А-ЯЁ][а-яё]+' + spaceFlex + '[А-ЯЁ][а-яё]+(?:вич|вна|ична|ьич)(?:а|у|е|ом|ем|ой|ей|ю|и|ого|ому|ым|ых)?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:[А-ЯЁ]\\.[\\s]*[А-ЯЁ]?\\.?[\\s]+)(?:[А-ЯЁ][а-яё]{2,25})' + e, 'gi'));
+  fio.push(new RegExp('(?:жалобы|жалобу|жалоба|заявления|заявление|ходатайства|иска|иске|запроса|просьбы|отношении)\\s+([А-ЯЁ]\\.)(?=\\s|$)', 'gi'));
+  fio.push(new RegExp(s + '(?:[А-ЯЁ]\\.[ ]*[А-ЯЁ]\\.?[\\s-]+)(?:[А-ЯЁ][а-яё]+(?:енко|ько|ко|ук|ку|ский|цкий|ов|ев|ин|ын|ой|ий|ец|енок|юк|чук|вич|ич|овым|евым|иным|ским|цким|овой|евой|иной|ской|цкой|ову|еву|ину|ыну|ове|еве|ине))' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:самозанят(?:ый|ая|ое|ые|ого|ой|ому|ым|ом))\\s+([А-ЯЁ][а-яё]+\\s+[А-ЯЁ][а-яё]+\\s+[А-ЯЁ][а-яё]+)' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:самозанят(?:ый|ая|ое|ые|ого|ой|ому|ым|ом))\\s+([А-ЯЁ][а-яё]+)(?:[а-яё]+)?\\s+([А-ЯЁ]\\.[\\s]*[А-ЯЁ]?\\.?)' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:самозанят(?:ый|ая|ое|ые|ого|ой|ому|ым|ом))\\s+([А-ЯЁ][а-яё]+)(?:[а-яё]+)?' + e, 'gi'));
+
+  var genitiveMarkers = 'ИП|индивидуальный предприниматель|в пользу|у|от|до|без|для|ради|взыскать|взыскание|ответчик|истец|должник|кредитор|заявитель|жалобщик|взыскатель|из|среди|между|возле|около|мимо|через|сквозь|вдоль|напротив|позади|впереди|сзади|справа|слева|внутри|снаружи|вне|кроме|вместо|вроде|наподобие|вследствие|по причине|благодаря|вопреки|навстречу|вслед|наперекор|согласно|по';
+  fio.push(new RegExp(s + '(?:' + genitiveMarkers + ')' + spaceFlex +
+    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + spaceFlex +
+    '(' + nP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + spaceFlex +
+    '(' + pP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:' + genitiveMarkers + ')' + spaceFlex +
+    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + spaceFlex +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:' + genitiveMarkers + ')' + spaceFlex +
+    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его)?' + e, 'gi'));
+
+  fio.push(new RegExp(s + '(?:с|со|за|над|под|перед|между|индивидуальным предпринимателем)' + spaceFlex +
+    '(?:ИП|индивидуальным предпринимателем|предпринимателем)?' + spaceFlex +
+    '(' + sP + ')(?:ым|им|ой|ей|ом|ем)?' + spaceFlex +
+    '(' + nP + ')(?:ем|ом|ой|ей|ым|им)?' + spaceFlex +
+    '(' + pP + ')(?:ем|ом|ой|ей|ым|им)?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:с|со|за|над|под|перед|между)' + spaceFlex +
+    '(?:ИП|индивидуальным предпринимателем|предпринимателем)?' + spaceFlex +
+    '(' + sP + ')(?:ым|им|ой|ей|ом|ем)?' + spaceFlex +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+
+  fio.push(new RegExp(s + '(?:к|по|благодаря|вопреки|навстречу)' + spaceFlex +
+    '(' + sP + ')(?:у|ю|е|и)?' + spaceFlex +
+    '(' + nP + ')(?:у|ю|е|и)?' + spaceFlex +
+    '(' + pP + ')(?:у|ю|е|и)?' + e, 'gi'));
+
+  fio.push(new RegExp(s + '(?:о|об|во|при|на|в)' + spaceFlex +
+    '(' + sP + ')(?:е|и|ы)?' + spaceFlex +
+    '(' + nP + ')(?:е|и|ы)?' + spaceFlex +
+    '(' + pP + ')(?:е|и|ы)?' + e, 'gi'));
+
+  var prepSpace = '[\\s-]+';
+  fio.push(new RegExp(s + '(?:от|до|без|для|ради|из|с|со|у|в пользу|взыскать|взыскание)' + prepSpace +
+    '([А-ЯЁ][а-яё]+)' + prepSpace +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:к|по|благодаря|вопреки|навстречу)' + prepSpace +
+    '([А-ЯЁ][а-яё]+)' + prepSpace +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:с|со|за|над|под|перед|между)' + prepSpace +
+    '([А-ЯЁ][а-яё]+)' + prepSpace +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:о|об|во|при|на|в)' + prepSpace +
+    '([А-ЯЁ][а-яё]+)' + prepSpace +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+
+  fio.push(new RegExp(s + '(?:от|к|по|у|до|без|для|ради|в пользу|взыскать|взыскание|из|с|со|за|над|под|перед|между|о|об|во|при|на|в|среди)' + spaceFlex +
+    '([А-ЯЁ][а-яё]+)' + spaceFlex +
+    '([А-ЯЁ][а-яё]+)' + spaceFlex +
+    '([А-ЯЁ][а-яё]+)' + e, 'gi'));
+
+  var caseMarkers = 'гражданки?|гражданина?|ответчика?|истца?|заявителя?|взыскателя?|должника?|кредитора?|представителя?|уполномоченного|доверенного|опекуна|попечителя|наследника|собственника|владельца|арендатора|нанимателя|работника?|сотрудника?|руководителя?|директора?|начальника?|генерального|председателя?|секретаря?|консультанта?|агента?|поставщика?|покупателя?|продавца?|клиента?|партнёра?|контрагента?|врача?|хирурга?|терапевта?|юриста?|адвоката?|судью?|прокурора?|следователя?|эксперта?|переводчика?|нотариуса?|арбитра?|посредника?|инвалида?|проживающей|зарегистрированной|гр-ки|г-жи|госпожи|пенсионера?|ветерана?|участника?|ребёнка?|несовершеннолетнего?|потерпевшего?|обвиняемого?|осуждённого?|заключённого?|пациента?|больного?';
+  fio.push(new RegExp(s + '(?:' + caseMarkers + ')' + spaceFlex +
+    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
+    '(' + nP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
+    '(?:' + pP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + e, 'gi'));
+  fio.push(new RegExp(s + '(?:' + caseMarkers + ')' + spaceFlex +
+    '(' + sP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
+    '(' + nP + ')(?:а|я|ы|и|ой|ей|ого|его|у|ю|е|ом|ем|ам|ям|ами|ями|ах|ях)?' + spaceFlex +
+    '[А-ЯЁ][.]?[ ]*[А-ЯЁ]?[.]?' + e, 'gi'));
+
+  var markerWords = ['гражданки','гражданина','инвалида','проживающей','зарегистрированной','гр-ки','г-жи','госпожи','ответчика','истца','заявителя','взыскателя','должника','кредитора','представителя','уполномоченного','доверенного','опекуна','попечителя','наследника','собственника','владельца','арендатора','нанимателя','работника','сотрудника','руководителя','директора','начальника','председателя','секретаря','консультанта','агента','поставщика','покупателя','продавца','клиента','партнёра','контрагента','врача','хирурга','терапевта','юриста','адвоката','судью','прокурора','следователя','эксперта','переводчика','нотариуса','арбитра','посредника','ип','индивидуальному','индивидуальному','предпринимателю','предпринимателя'];
+  for (var idx = 0; idx < markerWords.length; idx++) {
+    var marker = markerWords[idx];
+    fio.push(new RegExp(s + marker + '\\s+([А-ЯЁ][а-яё]+(?:[\\s-][А-ЯЁ][а-яё]+){2})' + e, 'gi'));
+    fio.push(new RegExp(s + marker + '\\s+([А-ЯЁ][а-яё]+(?:[\\s-][А-ЯЁ][а-яё]+){1})' + e, 'gi'));
   }
-  if (activeTypes.length === 0) { alert('Выберите хотя бы один тип данных для маскировки.'); return; }
 
+
+  // Адреса
+  var addr = [];
+  var cityShort = 'г|гор|п|пос|пгт|д|дер|с|сел|ст|стан|хут|х|сл|мкр|микр';
+  var streetShort = 'ул|улица|пр|просп|пр-т|проспект|пер|переулок|б|бул|б-р|бульвар|наб|набережная|ш|шоссе|туп|тупик|аллея|линия|проезд|тракт';
+  var streetShortCI = streetShort.split('|').map(function(m){ return '[' + m.charAt(0).toUpperCase() + m.charAt(0) + ']' + m.slice(1); }).join('|');
+  var houseShort = 'д|дом|кв|квартира|к|корп|корпус|стр|строение|оф|офис|комн|комната|эт|этаж|под|подъезд';
+  var cityPat = '(?:' + cityShort + ')[.]?[- ]*(' + cP + ')(?:е|у|ю|а|я|ы|и|ой|ей|ого|его|ом|ем|ам|ям|ах|ях)?';
+  var streetPat = '(?:' + streetShort + ')[.]?[- ]*(' + stP + ')';
+  var housePat = '(?:' + houseShort + ')[.]?[- ]*[:]?[- ]*([0-9]+[/-]?[0-9]*(?:[- ]*(?:' + houseShort + ')[.]?[- ]*[0-9]+)?)';
+  var regionPat = '(?:' + rP + ')';
+  var indexPat = '[0-9]{6}';
+
+  addr.push(new RegExp(s + '(' + indexPat + ')[-, ]*' + regionPat + '[-, ]*' + cityPat + '(?:[-, ]*' + streetPat + ')?(?:[-, ]*' + housePat + ')?' + e, 'gi'));
+  addr.push(new RegExp(s + regionPat + '[-, ]*' + cityPat + '(?:[-, ]*' + streetPat + ')?(?:[-, ]*' + housePat + ')?' + e, 'gi'));
+  addr.push(new RegExp(s + cityPat + '(?:[-, ]*' + streetPat + ')?(?:[-, ]*' + housePat + ')?' + e, 'gi'));
+  addr.push(new RegExp(s + streetPat + '(?:[-, ]*' + housePat + ')?' + e, 'gi'));
+  addr.push(new RegExp(s + '(?:' + streetShortCI + ')[.]?[ -]?(\\p{Lu}[^- ,.\\d]{2,30}(?:[- ]\\p{Lu}[^- ,.\\d]{2,30}){0,2})(?=,?\\s*(?:д|дом)[. ]*\\d)' + e, 'gu'));
+  addr.push(new RegExp(s + '(?:' + streetShortCI + ')[.]?[ -]?(\\p{Lu}[^- ,.\\d]{2,30}(?:[- ]\\p{Lu}[^- ,.\\d]{2,30}){0,2})[-, ]+([0-9]{1,4}(?:[-, ]+[0-9]{1,4}){0,2})' + e, 'gu'));
+  addr.push(new RegExp(s + '([0-9]{6})(?=,?\\s*(?:[А-ЯЁ][а-яё]+[\\s-]+){0,2}(?:обл|край|респ|р-н|район|г|город|ул|пр|пер)(?![а-яё]))' + e, 'gi'));
+  addr.push(new RegExp(s + '(?:дом|квартира|корпус|строение|офис|комната|этаж|подъезд|корп|комн|эт|под|оф|стр|кв|д|к)[.][- ]*[:]?[- ]*([0-9]+[/-]?[0-9]*(?:[- ](?:дом|квартира|корпус|строение|офис|комната|этаж|подъезд|корп|комн|эт|под|оф|стр|кв|д|к)[.][- ]*[0-9]+)?)' + e, 'gi'));
+
+
+  var addressPhrases = [
+    'проживающ(?:ий|ая|ие|его|ей|их|ую|им|ей)? по адресу',
+    'зарегистрирован(?:ный|ная|ные|ного|ной|ных|ным|ной|ными|ном|ной|ных)? по адресу',
+    'место жительства', 'адрес регистрации', 'адрес места жительства',
+    'почтовый адрес', 'фактический адрес', 'юридический адрес',
+    'жилплощадь', 'местонахождение', 'место пребывания', 'адрес проживания',
+    'адрес постоянной регистрации', 'адрес временной регистрации'
+  ];
+  for (var p = 0; p < addressPhrases.length; p++) {
+    var phrase = addressPhrases[p];
+    addr.push(new RegExp(s + phrase + '[: ]*([^,;.\\n]{5,50})' + e, 'gi'));
+  }
+  addr.push(new RegExp(s + '(?:ул|улица|пр|просп|пр-т|проспект|пер|переулок|б-р|бульвар|наб|набережная|шоссе|тупик|аллея|линия|проезд|тракт|дом|кв|квартира|корп|корпус|строение|оф|офис|комн|комната|эт|этаж|под|подъезд)[.][- ]*([0-9]{1,4}(?:[- ][0-9]{1,4}){0,2})' + e, 'gi'));
+
+  // Остальные типы
+  var idDoc = [
+    /(?<![0-9])([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})(?![0-9])/g,
+    /(?<![0-9])([0-9]{2}\s+[0-9]{2}\s*№\s*[0-9]{6})(?![0-9])/g,
+    /(?<![0-9A-ZА-Я])((?:[0-9]{2})?[A-Z]{2}[0-9]{4}[- ][0-9]{2}[- ][0-9]{4}[- ][0-9]{6}[- ][0-9]{2})(?![0-9])/g,
+    /(?<![0-9])([0-9]{4}[- ]?[0-9]{6})(?![0-9])/g,
+    /(?<![0-9])([0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{2})(?![0-9])/g,
+    /(?<![0-9])([0-9]{10,12})(?![0-9])/g,
+    /(?<![0-9])([0-9]{13})(?![0-9])/g,
+    /(?<![0-9])([0-9]{15})(?![0-9])/g,
+    /(?<![0-9])([0-9]{9})(?![0-9])/g,
+    /паспорт[- ]*(?:РФ|России|российский)?[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
+    /серия[- ]*([0-9]{2}[- ]?[0-9]{2})[- ]*номер[- ]*([0-9]{6})/gi,
+    /водительск(?:ое|ие|их)?[- ]*(?:удостоверение|права|прав)[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
+    /СТС[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
+    /ПТС[- ]*[:]?[- ]*([0-9]{2}[- ]?[0-9]{2}[- ]?[0-9]{6})/gi,
+    /ИНН[- ]*[:]?[- ]*([0-9]{10,12})/gi,
+    /СНИЛС[- ]*[:]?[- ]*([0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{3}[- ]?[0-9]{2})/gi,
+    /ОГРН[- ]*[:]?[- ]*([0-9]{13})/gi,
+    /ОГРНИП[- ]*[:]?[- ]*([0-9]{15})/gi,
+    /КПП[- ]*[:]?[- ]*([0-9]{9})/gi
+  ];
+
+  var date = [];
+  var dateCtx = '(?:дата[- ]*рождения|д[-. ]*р[-. ]*|родился|родилась|род[-. ]*|дата[- ]*рожд[-. ]*|др[-. ]*|дата рожд|дата рождения|дата рожд|дата выдачи|действительно до|срок действия|выдан|действителен до)';
+  date.push(new RegExp(s + dateCtx + '[: ]*([0-9]{1,2}[./-][0-9]{1,2}[./-](?:19|20)[0-9]{2})' + e, 'gi'));
+  date.push(new RegExp(s + dateCtx + '[: ]*([0-9]{1,2}[- ]+(?:' + monthsFull + ')[- ]+(?:19|20)[0-9]{2}(?:[- ]*г(?:ода)?)?)' + e, 'gi'));
+  date.push(new RegExp(s + '([0-9]{1,2}[./-][0-9]{1,2}[./-](?:19|20)[0-9]{2})' + e, 'g'));
+  date.push(new RegExp(s + '([0-9]{1,2}[- ]+(?:' + monthsFull + '|' + monthsShort + ')[- ]+(?:19|20)[0-9]{2}(?:[- ]*г(?:ода?)?)?)' + e, 'gi'));
+  date.push(new RegExp(s + '((?:19|20)[0-9]{2}[-/][0-9]{1,2}[-/][0-9]{1,2})' + e, 'g'));
+  date.push(new RegExp(s + '([0-9]{4})[- ]*(?:года|год)[- ]*рождения' + e, 'gi'));
+  date.push(new RegExp(s + 'рождения[- ]*([0-9]{4})[- ]*года?' + e, 'gi'));
+
+  var phone = [
+    /(?<![0-9+])[(]([0-9]{3})[)][- ]?([0-9]{3})[- ]([0-9]{2})[- ]([0-9]{2})(?![0-9])/g,
+    /(?<![0-9])((?:8|7)[- ]?[(]?[0-9]{3}[)]?[- ]?[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{2})(?![0-9])/g,
+    /(?<![0-9])([+][- ]?[0-9]{1,3}[- ]?[0-9]{1,4}[- ]?[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{2})(?![0-9])/g,
+    /(?<![0-9])([+][- ]?[0-9]{1,3}[- ]?[(]?[0-9]{1,4}[)]?[- ]?[0-9]{3}[- ]?[0-9]{2}[- ]?[0-9]{2})(?![0-9])/g,
+    /(?<![0-9])([0-9]{3}[- ][0-9]{2}[- ][0-9]{2})(?![0-9])/g
+  ];
+
+  var email = [/([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,})/g];
+
+  var card = [
+    /(?<![0-9])((?:[0-9]{4}[- ]?){3}[0-9]{4})(?![0-9])/g,
+    /(?<![0-9])([0-9]{4}[- ]?[0-9]{6}[- ]?[0-9]{5})(?![0-9])/g,
+    /CVV[- ]*[:]?[- ]*[0-9]{3}/gi,
+    /CVC[- ]*[:]?[- ]*[0-9]{3}/gi,
+    /(?<![0-9])([0-9]{2}\/[0-9]{2,4})(?![0-9])/g
+  ];
+
+  var ipAddr = [
+    /(?<![0-9])((?:[0-9]{1,3}[.]){3}[0-9]{1,3})(?![0-9])/g,
+    /(?<![0-9a-fA-F:])(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}(?![0-9a-fA-F:])/g
+  ];
+
+  var urlPat = [
+    /(https?:\/\/[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}(?:\/[a-zA-Z0-9._~:\/?#\]@!$&'()*+,;=-]*)?)/g,
+    /(www[.][a-zA-Z0-9.-]+[.][a-zA-Z]{2,})/g,
+    /([a-zA-Z0-9.-]+[.](?:ru|com|org|net|info|biz|pro|name|aero|asia|cat|coop|jobs|mobi|museum|post|tel|travel|xxx|edu|gov|int|mil|test|local|moscow|spb|москва|онлайн|сайт|рф|укр|бел|каз)(?:\/[a-zA-Z0-9._~:\/?#\]@!$&'()*+,;=-]*)?)/gi
+  ];
+
+  var vehicle = [
+    /(?<![0-9A-Z])([0-9]{4}[ ]?[A-Z]{2}[-]?[1-7])(?![0-9A-Z])/g,
+    /[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{3}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}/g,
+    /[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{3}[0-9]{2,3}/g,
+    /[АВЕКМНОРСТУХABEKMHOPCTYX][0-9]{2}[АВЕКМНОРСТУХABEKMHOPCTYX]{2}[0-9]{2,3}/g
+  ];
+
+  var moneyPat = [
+    /(?<![0-9])([0-9]{1,3}(?:[ ]?[0-9]{3})*[.,][0-9]{2})(?:[- ]*(?:руб|₽|RUB|USD|[$]|EUR|€|GBP|£|JPY|¥|CNY|CHF|CAD|AUD))(?![a-zA-Zа-яёА-ЯЁ0-9])/gi,
+    /(?<![0-9])([0-9]+(?:[ ]?[0-9]{3})*)(?:[- ]*(?:руб|₽|RUB|USD|[$]|EUR|€|GBP|£|JPY|¥|CNY|CHF|CAD|AUD))(?![a-zA-Zа-яёА-ЯЁ0-9])/gi,
+    /(?<![0-9])([0-9]{1,3}(?:[ ]?[0-9]{3})*[.,][0-9]{2})(?![a-zA-Zа-яёА-ЯЁ0-9])/g
+  ];
+
+  var company = [
+    new RegExp(s + "(?:ООО|ОАО|АО|ЗАО|ПАО|НАО|ТОО|ЧУП|ИЧУП|СООО|ГУП|МУП|ФГУП|ОДО|ОО|КООП|СП|ТД|НП|АНО|ПК|КПК|СПК|КФХ|УП|РУП|ПТ|Фонд)(?![а-яёa-zA-Z])[\\s]*[\\\"«']?([А-ЯЁA-Z][^\\\"»']{1,60})[\\\"»']?" + e, "gi"),
+    new RegExp(s + "(?:ООО|ОАО|АО|ЗАО|ПАО|НАО|ТОО|ЧУП|ИЧУП|СООО|ГУП|МУП|ФГУП|ОДО|ОО|КООП|СП|ТД|НП|АНО|ПК|КПК|СПК|КФХ|УП|РУП|ПТ|Фонд)(?![а-яёa-zA-Z])[\\s]+([А-ЯЁA-Z][а-яёa-zA-Z\\s\\-]{1,60})" + e, "gi"),
+    new RegExp(s + "(?:ООО|ОАО|АО|ЗАО|ПАО|НАО|ТОО|ЧУП|ИЧУП|СООО|ГУП|МУП|ФГУП|ОДО|ОО|КООП|СП|ТД|НП|АНО|ПК|КПК|СПК|КФХ|УП|РУП|ПТ|Фонд)(?![а-яёa-zA-Z])[\\s]*[\\\"«']([^\\\"»']{1,60})[\\\"»']" + e, "gi")
+  ];
+
+  return {
+    fio: fio,
+    address: addr,
+    phone: phone,
+    email: email,
+    id: idDoc,
+    card: card,
+    date: date,
+    ip: ipAddr,
+    url: urlPat,
+    vehicle: vehicle,
+    money: moneyPat,
+    company: company,
+    passby: [
+      /(?<![0-9A-Z])([0-9]{7}[A-Z][0-9]{3}[A-Z]{2}[0-9])(?![0-9A-Z])/g,
+      /(?:паспорт|паспорта|серии|серия)(?![а-яёa-z])[^0-9]{0,30}?([A-ZА-Я]{2})[^0-9]{0,25}?([0-9]{7})(?![0-9])/gi
+    ],
+    net: [
+      /(?<![0-9A-Fa-f])((?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2})(?![0-9A-Fa-f])/g,
+      /(?<![0-9.])(-?\d{1,2}[.,]\d{4,},?\s*-?\d{1,3}[.,]\d{4,})(?![0-9])/g
+    ]
+  };
+}
+
+
+// ========== ПРИМЕНЕНИЕ ЗАМЕН (с поддержкой ручных правок) ==========
+function applyAllMatches(text, matches) {
+  replacementMap = {};
+  var result = text;
+  var offset = 0;
+  var appliedEnd = -1;
+  var placeholders = {
+    fio: 'ФИО', address: 'АДРЕС', phone: 'ТЕЛЕФОН', email: 'EMAIL',
+    id: 'ДОКУМЕНТ', inn: 'ИНН', snils: 'СНИЛС', ogrn: 'ОГРН', passby: 'ПАСПОРТ-РБ', net: 'СЕТЬ', card: 'КАРТА', date: 'ДАТА', ip: 'IP',
+    url: 'URL', vehicle: 'ГОСНОМЕР', money: 'СУММА', company: 'ОРГАНИЗАЦИЯ'
+  };
+  var counters = {};
+  var reversibleMap = {};
+
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i];
+    var ov = matchOverrides[i];
+    if (ov && ov.skip) continue;
+    var placeholder = placeholders[m.type] || 'ДАННЫЕ';
+    if (!counters[placeholder]) counters[placeholder] = 0;
+    counters[placeholder]++;
+    var ph = (ov && ov.custom) ? ov.custom : placeholder + '-' + counters[placeholder];
+
+    if (currentMode === 'reversible' && !(ov && ov.custom)) {
+      reversibleMap[ph] = m.text;
+    }
+
+    if (m.start < appliedEnd) continue;
+    if (text.slice(m.start, m.end) !== m.text) {
+      var rs = text.indexOf(m.text, Math.max(0, m.start - 10));
+      if (rs === -1 || rs > m.start + 10 || rs < appliedEnd) continue;
+      m.start = rs; m.end = rs + m.text.length;
+    }
+    appliedEnd = m.end;
+    var mEnd2 = m.end;
+    if (/\s$/.test(m.text) && text.slice(m.start, m.end) === m.text) {
+      var mTrim = m.text.replace(/\s+$/, '');
+      if (mTrim.length !== m.text.length && text.slice(m.start, m.start + mTrim.length) === mTrim) {
+        mEnd2 = m.start + mTrim.length;
+      }
+    }
+    if (m.type === 'fio' && /\s[А-ЯЁа-яё]$/.test(m.text)) {
+      var afterSpan = text.slice(m.start + m.text.length);
+      if (/^\s+(?:И[.]?П[.]?|ООО|ОАО|ЗАО|ПАО|АО|ТОО|ЧУП|ГУП|МУП|ФГУП|НП|АНО)(?![а-яёА-ЯЁ])/.test(afterSpan)) {
+        mEnd2 = m.start + m.text.length - 2;
+      } else {
+        mEnd2 = m.start + m.text.replace(/\s+[А-ЯЁа-яё]$/, '').length;
+      }
+    }
+
+    var before = result.slice(0, m.start + offset);
+    var after = result.slice(mEnd2 + offset);
+    result = before + ph + after;
+    offset += ph.length - (mEnd2 - m.start);
+  }
+
+  resultText = result;
+  allFoundMatches = matches;
+  return reversibleMap;
+}
+
+function rebuildResult() {
+  if (!lastOriginalText) return;
+  applyAllMatches(lastOriginalText, lastMatches);
+  cleanText.value = resultText;
+}
+
+/* ---------- Редактор превью: полный текст; клик — вкл/выкл области; выделение — границы ---------- */
+
+function renderPreviewInteractive(original, matches) {
+  var html = '';
+  var last = 0;
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i];
+    html += escapeHtml(original.slice(last, m.start));
+    var color = typeColors[m.type] || '#999';
+    var st = uiState[i];
+    var active = !st || st.active !== false;
+    var titleAttr = (typeLabels[m.type] || m.type) + (m.score ? ' (score: ' + m.score + ')' : '') + (m.reason ? ' — ' + m.reason : '') + (active ? ' [СКРЫТО в результате — клик: оставить оригинал]' : ' [ОРИГИНАЛ останется в тексте — клик: скрыть]');
+    var style = active
+      ? 'background:' + color + '33;color:' + color + ';border-bottom:2px solid ' + color + ';border-radius:3px;padding:1px 3px;cursor:pointer;--anm-chip:"🙈 скрыто"'
+      : 'color:var(--text-3);border:1px dashed var(--text-3);border-radius:3px;padding:1px 3px;cursor:pointer;--anm-chip:"✓ останется в тексте"';
+    html += '<span class="anm-hl" data-i="' + i + '" data-on="' + (active ? 1 : 0) + '" style="' + style + '" title="' + escapeHtml(titleAttr) + '">' + escapeHtml(m.text) + '</span>';
+    last = m.end;
+  }
+  html += escapeHtml(original.slice(last));
+  preview.innerHTML = html;
+}
+
+function syncOverridesFromUi() {
+  matchOverrides = {};
+  for (var i in uiState) {
+    if (!uiState.hasOwnProperty(i)) continue;
+    if (uiState[i].active === false) matchOverrides[i] = { skip: true };
+  }
+}
+
+function rerenderInteractive() {
+  if (!lastOriginalText) return;
+  syncOverridesFromUi();
+  applyAllMatches(lastOriginalText, lastMatches);
+  cleanText.value = resultText;
+  renderPreviewInteractive(lastOriginalText, lastMatches);
+}
+
+/* ---------- История правок: отмена / сброс ---------- */
+
+function snapshotMatches(ms) {
+  return ms.map(function(m) {
+    return { start: m.start, end: m.end, text: m.text, type: m.type, score: m.score, reason: m.reason, patIdx: m.patIdx, grammarSource: m.grammarSource, propagated: m.propagated };
+  });
+}
+function snapshotUi(u) {
+  var c = {};
+  for (var k in u) { if (u.hasOwnProperty(k)) c[k] = { active: u[k].active }; }
+  return c;
+}
+function pushHistory() {
+  editHistory.push({ m: snapshotMatches(lastMatches), u: snapshotUi(uiState) });
+  if (editHistory.length > 60) editHistory.shift();
+  updateUndoBtn();
+}
+function updateUndoBtn() {
+  var b = document.getElementById('anmUndo');
+  if (b) b.disabled = editHistory.length === 0;
+  var r = document.getElementById('anmResetEdits');
+  if (r) r.disabled = !pristineMatches;
+}
+function undoEdit() {
+  var h = editHistory.pop();
+  if (!h) return;
+  lastMatches = h.m;
+  uiState = h.u;
+  rerenderInteractive();
+  updateUndoBtn();
+}
+function resetEdits() {
+  if (!pristineMatches) return;
+  pushHistory();
+  lastMatches = snapshotMatches(pristineMatches);
+  uiState = {};
+  rerenderInteractive();
+}
+
+function wordBoundsAt(pos) {
+  var t = lastOriginalText;
+  var re = /[0-9A-Za-zА-Яа-яЁё]/;
+  if (pos >= t.length || !re.test(t[pos] || '')) return null;
+  var s = pos; while (s > 0 && re.test(t[s-1])) s--;
+  var e = pos; while (e < t.length && re.test(t[e])) e++;
+  return { start: s, end: e };
+}
+
+function getPreviewSelectionRange() {
+  if (!window.getSelection) return null;
+  var sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  var range = sel.getRangeAt(0);
+  if (!preview.contains || !preview.contains(range.startContainer) || !preview.contains(range.endContainer)) return null;
+  function absOff(container, offset) {
+    if (container.nodeType === 3) {
+      var pos = 0, node;
+      var walker = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT, null);
+      while ((node = walker.nextNode())) {
+        if (node === container) return pos + offset;
+        pos += node.nodeValue.length;
+      }
+      return -1;
+    }
+    var pos2 = 0;
+    var kids = container.childNodes;
+    for (var k = 0; k < offset && k < kids.length; k++) pos2 += kids[k].textContent.length;
+    if (container !== preview) {
+      var walker2 = document.createTreeWalker(preview, NodeFilter.SHOW_TEXT, null);
+      var n2, acc = 0, found = -1;
+      while ((n2 = walker2.nextNode())) {
+        if (container.contains(n2)) { found = acc; break; }
+        acc += n2.nodeValue.length;
+      }
+      if (found === -1) return -1;
+      return found + pos2;
+    }
+    return pos2;
+  }
+  var s = absOff(range.startContainer, range.startOffset);
+  var e = absOff(range.endContainer, range.endOffset);
+  if (s < 0 || e < 0) return null;
+  return { start: Math.min(s, e), end: Math.max(s, e) };
+}
+
+if (preview && !preview.__anmBound) {
+  preview.__anmBound = true;
+  preview.addEventListener('click', function(e) {
+    // если только что было выделение — это не клик по области, а конец выделения
+    var selR = getPreviewSelectionRange();
+    if (selR && selR.end > selR.start) return;
+    var hl = e.target.closest ? e.target.closest('.anm-hl') : null;
+    pushHistory();
+    if (hl) {
+      var i2 = parseInt(hl.getAttribute('data-i'), 10);
+      var st2 = uiState[i2] || (uiState[i2] = {});
+      st2.active = (clickMode === 'hide');
+      rerenderInteractive();
+      return;
+    }
+    // режим «скрывать»: клик по обычному слову создаёт новую область
+    if (clickMode === 'hide' && selR) {
+      var wb = wordBoundsAt(selR.start);
+      if (wb && wb.end > wb.start) {
+        for (var q = 0; q < lastMatches.length; q++) {
+          if (wb.start < lastMatches[q].end && wb.end > lastMatches[q].start) { updateUndoBtn(); return; }
+        }
+        var oldStates = {};
+        for (var i = 0; i < lastMatches.length; i++) {
+          if (uiState[i]) oldStates[lastMatches[i].start + ':' + lastMatches[i].end] = uiState[i].active;
+        }
+        oldStates[wb.start + ':' + wb.end] = true;
+        lastMatches.push({ start: wb.start, end: wb.end, text: lastOriginalText.slice(wb.start, wb.end), type: 'fio', score: 100, reason: 'Ручная область (клик)' });
+        lastMatches.sort(function(a, b) { return a.start - b.start; });
+        uiState = {};
+        for (var j = 0; j < lastMatches.length; j++) {
+          var key = lastMatches[j].start + ':' + lastMatches[j].end;
+          if (oldStates.hasOwnProperty(key)) uiState[j] = { active: oldStates[key] };
+        }
+        rerenderInteractive();
+      } else { updateUndoBtn(); }
+    } else { updateUndoBtn(); }
+  });
+  var modeHide = document.getElementById('anmModeHide');
+  var modeKeep = document.getElementById('anmModeKeep');
+  if (modeHide && !modeHide.__bound) {
+    modeHide.__bound = true;
+    modeHide.addEventListener('click', function() {
+      clickMode = 'hide';
+      modeHide.classList.add('on'); modeKeep.classList.remove('on');
+    });
+    modeKeep.addEventListener('click', function() {
+      clickMode = 'keep';
+      modeKeep.classList.add('on'); modeHide.classList.remove('on');
+    });
+  }
+  var hideSelBtn = document.getElementById('anmHideSel');
+  if (hideSelBtn && !hideSelBtn.__bound) {
+    hideSelBtn.__bound = true;
+    hideSelBtn.addEventListener('click', function() {
+      var r = getPreviewSelectionRange();
+      if (!r || r.end <= r.start) return;
+      // обрезаем края: область не должна начинаться/заканчиваться пробелом или переносом
+      while (r.start < r.end && /\s/.test(lastOriginalText[r.start])) r.start++;
+      while (r.end > r.start && /\s/.test(lastOriginalText[r.end-1])) r.end--;
+      if (r.end <= r.start) return;
+      pushHistory();
+      if (window.getSelection) window.getSelection().removeAllRanges();
+      // сохраняем текущие состояния по ключу позиции
+      var oldStates = {};
+      for (var i = 0; i < lastMatches.length; i++) {
+        if (uiState[i]) oldStates[lastMatches[i].start + ':' + lastMatches[i].end] = uiState[i].active;
+      }
+      var idx = -1;
+      for (var i = 0; i < lastMatches.length; i++) {
+        var m = lastMatches[i];
+        if (r.start >= m.start && r.start <= m.end) { idx = i; break; }
+      }
+      if (idx >= 0) {
+        lastMatches[idx].start = r.start;
+        lastMatches[idx].end = r.end;
+        lastMatches[idx].text = lastOriginalText.slice(r.start, r.end);
+        lastMatches[idx].reason = 'Ручная корректировка границ';
+        var key = r.start + ':' + r.end;
+        oldStates[key] = true;
+      } else {
+        var body = lastOriginalText.slice(r.start, r.end);
+        var type = /[0-9]/.test(body) ? 'id' : 'fio';
+        lastMatches.push({ start: r.start, end: r.end, text: body, type: type, score: 100, reason: 'Ручная область' });
+        lastMatches.sort(function(a, b) { return a.start - b.start; });
+        oldStates[r.start + ':' + r.end] = true;
+      }
+      uiState = {};
+      for (var j = 0; j < lastMatches.length; j++) {
+        var key2 = lastMatches[j].start + ':' + lastMatches[j].end;
+        if (oldStates.hasOwnProperty(key2)) uiState[j] = { active: oldStates[key2] };
+      }
+      // перекрывающиеся области деактивируем
+      for (var k = 0; k < lastMatches.length; k++) {
+        var mm = lastMatches[k];
+        if (mm.start < r.end && mm.end > r.start) {
+          if (!uiState[k]) uiState[k] = { active: false };
+          else uiState[k].active = false;
+        }
+      }
+      rerenderInteractive();
+    });
+    var undoBtn = document.getElementById('anmUndo');
+    if (undoBtn && !undoBtn.__bound) {
+      undoBtn.__bound = true;
+      undoBtn.addEventListener('click', undoEdit);
+    }
+    var resetBtn = document.getElementById('anmResetEdits');
+    if (resetBtn && !resetBtn.__bound) {
+      resetBtn.__bound = true;
+      resetBtn.addEventListener('click', resetEdits);
+    }
+    updateUndoBtn();
+    document.addEventListener('selectionchange', function() {
+      var rr = getPreviewSelectionRange();
+      var ok = !!(rr && rr.end > rr.start);
+      hideSelBtn.disabled = !ok;
+      if (ok) {
+        var inside = false;
+        for (var i = 0; i < lastMatches.length; i++) {
+          if (rr.start >= lastMatches[i].start && rr.start <= lastMatches[i].end) { inside = true; break; }
+        }
+        hideSelBtn.textContent = inside ? '✂️ Задать границы области' : '🙈 Скрыть выделенное';
+      } else {
+        hideSelBtn.textContent = '🙈 Скрыть выделенное';
+      }
+    });
+  }
+}
+
+// ========== ГЛАВНАЯ ФУНКЦИЯ АНОНИМИЗАЦИИ ==========
+window.anonymize = function() {
+  var text = sourceText.value;
+  if (!text || !text.trim()) {
+    alert('Вставьте текст для анонимизации');
+    return;
+  }
+  resultSection.classList.add('hidden');
   progressBarContainer.style.display = 'block';
   setProgress(10);
 
   setTimeout(function() {
-    replacementMap = {};
-    allFoundMatches = [];
-    var patterns = buildPatterns();
-    var allMatches = [];
-
-    for (var t = 0; t < activeTypes.length; t++) {
-      var type = activeTypes[t];
-      var pats = patterns[type];
-      if (!pats) continue;
-      var found = findAllMatches(text, pats, type);
-      for (var f = 0; f < found.length; f++) {
-        found[f].type = type;
+    try {
+      var activeTypes = [];
+      var chips = document.querySelectorAll('#typeChips .chip');
+      for (var i = 0; i < chips.length; i++) {
+        if (chips[i].classList.contains('checked')) {
+          activeTypes.push(chips[i].getAttribute('data-type'));
+        }
       }
-      allMatches = allMatches.concat(found);
-    }
-    setProgress(30);
 
-    var fioMatches = allMatches.filter(function(m){ return m.type === 'fio'; });
-    var otherMatches = allMatches.filter(function(m){ return m.type !== 'fio'; });
-    var filteredFio = filterFioCascade(text, fioMatches);
-    var confirmedFio = filteredFio.filter(function(m){ return m.score >= 80; });
-    var workingMatches = otherMatches.concat(filteredFio);
-    setProgress(50);
+      var patterns = buildPatterns();
+      var allMatches = [];
 
-    if (activeTypes.indexOf('fio') !== -1 && confirmedFio.length > 0) {
-      var propagated = propagateFio(text, confirmedFio);
-      if (propagated.length > 0) {
-        var combined = allMatches.concat(propagated);
-        var reFiltered = filterFioCascade(text, combined);
-        workingMatches = reFiltered;
+      // 1. Грамматический анализ
+      setProgress(20);
+      var grammarMatches = analyzeWithGrammar(text);
+      for (var i = 0; i < grammarMatches.length; i++) {
+        if (activeTypes.indexOf(grammarMatches[i].type) !== -1) {
+          allMatches.push(grammarMatches[i]);
+        }
       }
-    }
-    setProgress(60);
 
-    var numericTypes = ['phone', 'id', 'date'];
-    var numericCandidates = workingMatches.filter(function(m){ return numericTypes.indexOf(m.type) !== -1; });
-    var deduped = deduplicateNumericMatches(text, numericCandidates);
-    var nonNumeric = workingMatches.filter(function(m){ return numericTypes.indexOf(m.type) === -1; });
-    workingMatches = nonNumeric.concat(deduped);
-    setProgress(70);
+      // 2. Регулярные выражения
+      setProgress(40);
+      for (var typeIdx = 0; typeIdx < activeTypes.length; typeIdx++) {
+        var type = activeTypes[typeIdx];
+        var typePatterns = patterns[type] || [];
+        for (var pIdx = 0; pIdx < typePatterns.length; pIdx++) {
+          var regex = typePatterns[pIdx];
+          regex.lastIndex = 0;
+          var match;
+          while ((match = regex.exec(text)) !== null) {
+            var start = match.index;
+            var end = match.index + match[0].length;
+            var matchedText = match[0];
 
-    var cleanMatches = removeOverlapping(workingMatches);
-    allFoundMatches = cleanMatches;
-    setProgress(80);
+            if (type === 'fio' && match[1]) {
+              var goff = matchedText.indexOf(match[1]);
+              start = match.index + goff;
+              end = match.index + match[0].length;
+              while (end < text.length && /[а-яёА-ЯЁ]/.test(text[end])) end++;
+              matchedText = text.slice(start, end);
+              matchedText = matchedText.replace(/\s+[А-ЯЁа-яё]$/, '').replace(/\s+$/, '');
+              end = start + matchedText.length;
+            }
 
-    var counters = {};
-    var working = text;
-    for (var ct = 0; ct < activeTypes.length; ct++) counters[activeTypes[ct]] = 0;
-
-    for (var k = cleanMatches.length - 1; k >= 0; k--) {
-      var m2 = cleanMatches[k];
-      var type2 = m2.type;
-      if (!counters[type2]) counters[type2] = 0;
-      counters[type2]++;
-      var key = '{{' + type2.toUpperCase() + '_' + counters[type2] + '}}';
-      if (currentMode === 'reversible') {
-        replacementMap[key] = m2.text;
+            allMatches.push({
+              start: start,
+              end: end,
+              text: matchedText,
+              type: type,
+              patIdx: pIdx
+            });
+            if (match.index === regex.lastIndex) regex.lastIndex++;
+          }
+        }
       }
-      var replacement = currentMode === 'reversible' ? key : '[' + typeLabels[type2].toUpperCase() + ']';
-      working = working.slice(0, m2.start) + replacement + working.slice(m2.end);
+
+      // 3. Пользовательские слова
+      setProgress(50);
+      var customWords = getCustomWords();
+      for (var i = 0; i < customWords.length; i++) {
+        var cw = customWords[i];
+        var cwRegex = new RegExp('(?<![а-яёА-ЯЁa-zA-Z0-9])' + escapeRegExp(cw) + '(?![а-яёА-ЯЁa-zA-Z0-9])', 'gi');
+        var cwMatch;
+        while ((cwMatch = cwRegex.exec(text)) !== null) {
+          allMatches.push({
+            start: cwMatch.index,
+            end: cwMatch.index + cwMatch[0].length,
+            text: cwMatch[0],
+            type: 'fio',
+            score: 90,
+            reason: 'Пользовательское слово'
+          });
+        }
+      }
+
+      // 3.5 ФИО сразу после маркера улицы -> это адрес (ул. Волкова)
+      var streetMarkRe = /((?<![а-яёА-ЯЁa-zA-Z])(?:ул|улица|пр|просп|пр-т|пер|переулок|б|бул|б-р|бульвар|наб|набережная|ш|шоссе|туп|тупик|аллея|линия|проезд|тракт)\.?[\s-]*)$/i;
+      for (var sm = 0; sm < allMatches.length; sm++) {
+        var smm = allMatches[sm];
+        if (smm.type !== 'fio') continue;
+        var before = text.slice(Math.max(0, smm.start - 12), smm.start);
+        if (streetMarkRe.test(before)) {
+          smm.type = 'address';
+          smm.score = 90;
+          smm.reason = 'Улица (переклассификация ФИО→Адрес)';
+        }
+      }
+
+      // 3.6 Расшифровка типов документов РФ/РБ
+      for (var di = 0; di < allMatches.length; di++) {
+        var dm = allMatches[di];
+        if (dm.type !== 'id') continue;
+        var dl = dm.text.toUpperCase();
+        if (/ИНН/.test(dl)) dm.type = 'inn';
+        else if (/СНИЛС/.test(dl)) dm.type = 'snils';
+        else if (/ОГРНИП|ОГРН/.test(dl)) dm.type = 'ogrn';
+      }
+
+      // 4. Дедупликация числовых совпадений
+      allMatches = deduplicateNumericMatches(text, allMatches);
+
+      // 5. Фильтрация ФИО
+      setProgress(60);
+      allMatches = filterFioCascade(text, allMatches);
+
+      // 6. Морфологический анализ
+      setProgress(70);
+      allMatches = analyzeWithMorphology(allMatches, text);
+
+      // 7. Распространение ФИО
+      setProgress(80);
+      var confirmedFio = [];
+      for (var i = 0; i < allMatches.length; i++) {
+        if (allMatches[i].type === 'fio') confirmedFio.push(allMatches[i]);
+      }
+      var propagated = propagateFioWithCases(text, confirmedFio);
+      for (var i = 0; i < propagated.length; i++) {
+        allMatches.push(propagated[i]);
+      }
+
+      // 8. Объединение адресов
+      setProgress(85);
+      var addrMatches = [];
+      var otherMatches = [];
+      for (var i = 0; i < allMatches.length; i++) {
+        if (allMatches[i].type === 'address') addrMatches.push(allMatches[i]);
+        else otherMatches.push(allMatches[i]);
+      }
+      addrMatches = mergeAddressMatches(text, addrMatches);
+      allMatches = otherMatches.concat(addrMatches);
+
+      // 9. Сортировка и удаление пересечений
+      setProgress(90);
+      allMatches = allMatches.filter(function(m) { return text.slice(m.start, m.end) === m.text; });
+      allMatches.sort(function(a, b) { return a.start - b.start; });
+      var finalMatches = [];
+      for (var i = 0; i < allMatches.length; i++) {
+        var m = allMatches[i];
+        var overlap = false;
+        for (var j = 0; j < finalMatches.length; j++) {
+          var fm = finalMatches[j];
+          var touches = (m.start < fm.end && m.end > fm.start) ||
+            (m.type === 'fio' && fm.type === 'fio' && m.start >= fm.end && (m.start - fm.end) <= 1);
+          if (touches) {
+            if ((m.type === 'fio' && fm.type === 'fio') || (m.type === 'address' && fm.type === 'address')) {
+              // фрагменты одного ФИО или адреса — объединяем (но не через перенос строки)
+              var lo = Math.min(fm.start, m.start), hi = Math.max(fm.end, m.end);
+              var isFioPair = (m.type === 'fio' && fm.type === 'fio');
+              var gapStr = text.slice(Math.min(fm.end, m.end), Math.max(fm.start, m.start));
+              var unionHasNl = text.slice(lo, hi).indexOf('\n') !== -1;
+              if (gapStr.indexOf('\n') === -1 && (!isFioPair || !unionHasNl)) {
+                while (lo < hi && /\s/.test(text[lo])) lo++;
+                while (hi > lo && /\s/.test(text[hi-1])) hi--;
+                fm.start = lo; fm.end = hi;
+                fm.text = text.slice(lo, hi);
+              } else if ((m.end - m.start) > (fm.end - fm.start)) {
+                finalMatches[j] = m;
+              }
+            } else if ((m.end - m.start) > (fm.end - fm.start)) {
+              finalMatches[j] = m;
+            }
+            overlap = true;
+            break;
+          }
+        }
+        if (!overlap) finalMatches.push(m);
+      }
+      allMatches = finalMatches;
+
+      // 10. Замена
+      setProgress(95);
+      lastOriginalText = text;
+      lastMatches = allMatches;
+      matchOverrides = {};
+      uiState = {};
+      editHistory = [];
+      pristineMatches = snapshotMatches(allMatches);
+      updateUndoBtn();
+      var reversibleMap = applyAllMatches(text, allMatches);
+      var result = resultText;
+
+      setProgress(100);
+      showResults(text, result, allMatches, reversibleMap);
+      setTimeout(function() {
+        progressBarContainer.style.display = 'none';
+        setProgress(0);
+      }, 500);
+
+    } catch (e) {
+      console.error(e);
+      alert('Ошибка при анонимизации: ' + e.message);
+      progressBarContainer.style.display = 'none';
     }
-    resultText = working;
-
-    stats.innerHTML = activeTypes.map(function(t){
-      return '<div class="stat"><span class="stat-value">' + (counters[t] || 0) + '</span><div class="stat-label">' + typeLabels[t] + '</div></div>';
-    }).join('');
-
-    var htmlPreview = text;
-    for (var p2 = cleanMatches.length - 1; p2 >= 0; p2--) {
-      var m3 = cleanMatches[p2];
-      var color = typeColors[m3.type] || '#0071e3';
-      var span = '<span style="background:' + color + '22;color:' + color + ';border:1px solid ' + color + '44;border-radius:4px;padding:1px 4px;font-weight:600;" title="' + typeLabels[m3.type] + ' (score: ' + (m3.score || 0) + ')">' + text.slice(m3.start, m3.end) + '</span>';
-      htmlPreview = htmlPreview.slice(0, m3.start) + span + htmlPreview.slice(m3.end);
-    }
-    preview.innerHTML = htmlPreview;
-
-    legend.innerHTML = activeTypes.map(function(t){
-      return '<span class="legend-item"><span class="dot" style="background:' + (typeColors[t] || '#0071e3') + '"></span>' + typeLabels[t] + '</span>';
-    }).join('');
-
-    matchList.innerHTML = cleanMatches.map(function(m4){
-      return '<div class="match-item"><span class="match-type" style="background:' + (typeColors[m4.type] || '#0071e3') + '22;color:' + (typeColors[m4.type] || '#0071e3') + '">' + typeLabels[m4.type] + '</span><span class="match-text">' + m4.text + '</span><span class="match-score">' + (m4.score || 0) + '</span><span class="match-reason">' + (m4.reason || '') + '</span></div>';
-    }).join('');
-    matchCountBadge.textContent = cleanMatches.length;
-
-    cleanText.value = resultText;
-    resultSection.classList.remove('hidden');
-    downloadMapBtn.classList.toggle('hidden', currentMode !== 'reversible');
-
-    setProgress(100);
-    setTimeout(function() { progressBarContainer.style.display = 'none'; progressBar.style.width = '0'; }, 600);
-    resultSection.scrollIntoView({ behavior: 'smooth' });
   }, 50);
-}
+};
 
-// ========== ФУНКЦИИ ДЛЯ ПОЛЗУНКОВ ==========
-function setMode(mode) {
-  currentMode = mode;
-  var btns = document.querySelectorAll('.toggle-btn');
-  for (var i=0; i<btns.length; i++) {
-    btns[i].classList.toggle('active', btns[i].dataset.mode === mode);
+function showResults(original, result, matches, reversibleMap) {
+  resultSection.classList.remove('hidden');
+
+  var counts = {};
+  for (var i = 0; i < matches.length; i++) {
+    var t = matches[i].type;
+    counts[t] = (counts[t] || 0) + 1;
   }
-  modeHint.textContent = mode === 'mask' ? 'Заменяет данные на плейсхолдеры. Результат готов к публикации.' : 'Сохраняет карту замен для восстановления. Не забудьте скачать .json!';
-  downloadMapBtn.classList.toggle('hidden', mode !== 'reversible');
+  var statsHtml = '';
+  for (var type in counts) {
+    if (counts.hasOwnProperty(type)) {
+      statsHtml += '<div class="stat"><span class="stat-value">' + counts[type] + '</span><span class="stat-label">' + (typeLabels[type] || type) + '</span></div>';
+    }
+  }
+  statsHtml += '<div class="stat"><span class="stat-value">' + matches.length + '</span><span class="stat-label">Всего</span></div>';
+  stats.innerHTML = statsHtml;
+
+  renderPreviewInteractive(original, matches);
+
+  var usedTypes = {};
+  for (var i = 0; i < matches.length; i++) usedTypes[matches[i].type] = true;
+  var legendHtml = '';
+  for (var type in usedTypes) {
+    if (usedTypes.hasOwnProperty(type)) {
+      legendHtml += '<span class="legend-item"><span class="dot" style="background:' + (typeColors[type] || '#999') + '"></span>' + (typeLabels[type] || type) + '</span>';
+    }
+  }
+  legend.innerHTML = legendHtml;
+
+  var listHtml = '';
+  for (var i = 0; i < matches.length; i++) {
+    var m = matches[i];
+    listHtml += '<div class="match-item"><span class="match-text">' + escapeHtml(m.text) + '</span><span class="match-type">' + (typeLabels[m.type] || m.type) + '</span>' + (m.score ? '<span class="match-score">' + m.score + '</span>' : '') + (m.reason ? '<span class="match-reason">' + escapeHtml(m.reason) + '</span>' : '') + '</div>';
+  }
+  matchList.innerHTML = listHtml || '<div style="padding:8px;color:var(--text-3)">Нет совпадений</div>';
+  matchCountBadge.textContent = matches.length;
+
+  cleanText.value = result;
+
+  if (lastGrammarResult && lastGrammarResult.sentences) {
+    var gHtml = '<div style="font-weight:600;margin-bottom:8px">Предложений: ' + lastGrammarResult.sentences.length + '</div>';
+    for (var i = 0; i < Math.min(lastGrammarResult.sentences.length, 20); i++) {
+      var sent = lastGrammarResult.sentences[i];
+      gHtml += '<div style="margin-bottom:12px;border-left:3px solid var(--accent);padding-left:8px">';
+      gHtml += '<div style="color:var(--text-2);font-size:11px">Предложение ' + (i+1) + '</div>';
+      gHtml += '<div>' + escapeHtml(sent.text) + '</div>';
+      if (sent.fioConstructions && sent.fioConstructions.length > 0) {
+        gHtml += '<div style="color:var(--positive);font-size:11px;margin-top:4px">ФИО-конструкций: ' + sent.fioConstructions.length + '</div>';
+      }
+      if (sent.addressConstructions && sent.addressConstructions.length > 0) {
+        gHtml += '<div style="color:var(--warning);font-size:11px;margin-top:4px">Адресных конструкций: ' + sent.addressConstructions.length + '</div>';
+      }
+      gHtml += '</div>';
+    }
+    grammarPreview.innerHTML = gHtml;
+  } else {
+    grammarPreview.innerHTML = '<div style="color:var(--text-3)">Грамматический разбор недоступен. Проверьте подключение grammar-analyzer.js</div>';
+  }
+
+  if (currentMode === 'reversible') {
+    replacementMap = reversibleMap;
+    downloadMapBtn.classList.remove('hidden');
+  } else {
+    downloadMapBtn.classList.add('hidden');
+  }
 }
 
-function updateSensitivity(val) {
-  sensitivity = parseInt(val, 10);
+function escapeHtml(s) {
+  if (s == null) return '';
+  s = String(s);
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ========== UI ФУНКЦИИ ==========
+window.setMode = function(mode) {
+  currentMode = mode;
+  var buttons = document.querySelectorAll('.toggle-btn[data-mode]');
+  for (var i = 0; i < buttons.length; i++) {
+    if (buttons[i].getAttribute('data-mode') === mode) buttons[i].classList.add('active');
+    else buttons[i].classList.remove('active');
+  }
+  if (mode === 'mask') {
+    modeHint.textContent = 'Заменяет данные на плейсхолдеры. Восстановление невозможно.';
+  } else {
+    modeHint.textContent = 'Сохраняет карту замен. Можно восстановить исходный текст.';
+  }
+};
+
+window.updateSensitivity = function(val) {
+  sensitivity = parseInt(val);
   var labels = ['Низкая', 'Средняя', 'Высокая'];
-  document.getElementById('sensVal').textContent = labels[sensitivity-1] || 'Низкая';
-}
-function updateFioStrictness(val) {
-  fioThreshold = parseInt(val, 10);
-  document.getElementById('fioStrictVal').textContent = fioThreshold;
-}
-function updateStrictOnly(checked) {
-  strictOnly = checked;
-}
+  document.getElementById('sensVal').textContent = labels[sensitivity - 1] || val;
+};
 
-function switchTab(tab) {
+window.updateFioStrictness = function(val) {
+  fioThreshold = parseInt(val);
+  document.getElementById('fioStrictVal').textContent = val;
+};
+
+window.updateStrictOnly = function(checked) {
+  strictOnly = checked;
+};
+
+window.updateValidateDict = function(checked) {
+  validateDict = checked;
+};
+
+window.toggleMorphology = function(checked) {
+  useMorphology = checked;
+};
+
+window.toggleGrammar = function(checked) {
+  useGrammar = checked;
+};
+
+window.switchTab = function(tab) {
   var tabs = document.querySelectorAll('.tab');
   var contents = document.querySelectorAll('.tab-content');
-  for (var i=0; i<tabs.length; i++) tabs[i].classList.remove('active');
-  for (var j=0; j<contents.length; j++) contents[j].classList.remove('active');
-  var tabEl = document.getElementById('tab-'+tab);
-  var contentEl = document.getElementById('content-'+tab);
-  if (tabEl) tabEl.classList.add('active');
-  if (contentEl) contentEl.classList.add('active');
-}
+  for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
+  for (var i = 0; i < contents.length; i++) contents[i].classList.remove('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('content-' + tab).classList.add('active');
+};
 
-function downloadResult() {
-  var blob = new Blob([resultText], { type: 'text/plain;charset=utf-8' });
+window.downloadResult = function() {
+  if (loadedExt === '.docx' && typeof docx !== 'undefined') {
+    try {
+      var lines = resultText.split(/\r?\n/);
+      var children = [];
+      for (var li = 0; li < lines.length; li++) {
+        children.push(new docx.Paragraph({ children: [new docx.TextRun(lines[li] || ' ')] }));
+      }
+      var doc = new docx.Document({ sections: [{ children: children }] });
+      docx.Packer.toBlob(doc).then(function(blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = loadedBaseName + '-anonymized.docx';
+        a.click();
+        URL.revokeObjectURL(url);
+      });
+      return;
+    } catch (err) { /* fallback к txt */ }
+  }
+  var blob = new Blob([resultText], {type: 'text/plain;charset=utf-8'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'anonymized.txt';
+  a.download = loadedBaseName + '-anonymized.txt';
   a.click();
   URL.revokeObjectURL(url);
-}
-function downloadMap() {
-  if (currentMode !== 'reversible') return;
-  var blob = new Blob([JSON.stringify(replacementMap, null, 2)], { type: 'application/json' });
+};
+
+window.downloadMap = function() {
+  if (!replacementMap || Object.keys(replacementMap).length === 0) return;
+  var blob = new Blob([JSON.stringify(replacementMap, null, 2)], {type: 'application/json'});
   var url = URL.createObjectURL(blob);
   var a = document.createElement('a');
   a.href = url;
-  a.download = 'replacement_map.json';
+  a.download = 'replacement-map.json';
   a.click();
   URL.revokeObjectURL(url);
-}
-function copyResult() {
-  navigator.clipboard.writeText(resultText).then(function() {
-    var btn = document.querySelector('button[onclick="window.copyResult()"]');
-    var orig = btn.innerHTML;
-    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Скопировано!';
-    setTimeout(function() { btn.innerHTML = orig; }, 1500);
-  });
-}
-function restore() {
-  var fileText = document.getElementById('restoreFile').files[0];
-  var fileMap = document.getElementById('restoreMap').files[0];
-  var out = document.getElementById('restoreResult');
-  if (!fileText || !fileMap) {
-    out.innerHTML = '<div style="color:var(--danger)">Загрузите оба файла.</div>';
+};
+
+window.copyResult = function() {
+  cleanText.select();
+  document.execCommand('copy');
+  var btn = event.target.closest('button');
+  var original = btn.innerHTML;
+  btn.innerHTML = 'Скопировано';
+  setTimeout(function() { btn.innerHTML = original; }, 1500);
+};
+
+window.restore = function() {
+  var fileInput = document.getElementById('restoreFile');
+  var mapInput = document.getElementById('restoreMap');
+  var resultDiv = document.getElementById('restoreResult');
+  
+  if (!fileInput.files[0] || !mapInput.files[0]) {
+    resultDiv.innerHTML = '<div style="color:var(--danger)">Выберите оба файла</div>';
     return;
   }
-  var readerText = new FileReader();
-  var readerMap = new FileReader();
-  readerMap.onload = function(e) {
-    var map = JSON.parse(e.target.result);
-    readerText.onload = function(ev) {
-      var restored = ev.target.result;
-      var keys = Object.keys(map).sort(function(a,b) {
-        var na = parseInt(a.match(/\d+/)[0], 10);
-        var nb = parseInt(b.match(/\d+/)[0], 10);
-        return nb - na;
-      });
-      for (var i=0; i<keys.length; i++) {
-        restored = restored.split(keys[i]).join(map[keys[i]]);
-      }
-      var blob = new Blob([restored], { type: 'text/plain;charset=utf-8' });
-      var url = URL.createObjectURL(blob);
-      out.innerHTML = '<div style="margin-top:8px">Восстановление завершено. <a class="btn" href="'+url+'" download="restored.txt">Скачать</a></div>';
-    };
-    readerText.readAsText(fileText);
+
+  var reader1 = new FileReader();
+  var reader2 = new FileReader();
+  var text, map;
+
+  reader1.onload = function(e) {
+    text = e.target.result;
+    if (map) doRestore(text, map);
   };
-  readerMap.readAsText(fileMap);
-}
+  reader2.onload = function(e) {
+    try {
+      map = JSON.parse(e.target.result);
+      if (text) doRestore(text, map);
+    } catch(err) {
+      resultDiv.innerHTML = '<div style="color:var(--danger)">Ошибка в JSON: ' + err.message + '</div>';
+    }
+  };
 
-// ========== ЭКСПОРТ В ГЛОБАЛЬНУЮ ОБЛАСТЬ ==========
-window.anonymize = anonymize;
-window.setMode = setMode;
-window.updateSensitivity = updateSensitivity;
-window.updateFioStrictness = updateFioStrictness;
-window.updateStrictOnly = updateStrictOnly;
-window.updateValidateDict = function(checked) { validateDict = checked; };
-window.switchTab = switchTab;
-window.downloadResult = downloadResult;
-window.downloadMap = downloadMap;
-window.copyResult = copyResult;
-window.restore = restore;
-window.insertTestText = function() {
-  sourceText.value = 'Истец: гражданка Савельева Ядвига Яковлевна, 15.03.1985 г.р., проживающая по адресу: г. Щучин, ул. Ленина, д. 9, кв. 7.\n\nОтветчик: ИП Серко Алексей Васильевич, тел. +375291234567, паспорт МС1234567.\n\nВ рамках досудебного урегулирования стороны достигли договорённости. Сумма иска составляет 1 250 000 руб. (один миллион двести пятьдесят тысяч рублей).\n\nДополнительно: г. Москва, пр. Ленина, д. 5, кв. 12, корп. 3.';
-};
-window.clearAll = function() { sourceText.value = ''; resultSection.classList.add('hidden'); };
-
-// ========== ОБРАБОТКА ФАЙЛОВ ==========
-function handleFile(file) {
-  var ext = file.name.split('.').pop().toLowerCase();
-  if (ext === 'txt' || ext === 'md') {
-    var reader = new FileReader();
-    reader.onload = function(e) { sourceText.value = e.target.result; };
-    reader.readAsText(file);
-  } else if (ext === 'docx') {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      if (typeof mammoth !== 'undefined') {
-        mammoth.extractRawText({ arrayBuffer: e.target.result }).then(function(r) {
-          sourceText.value = r.value;
-        }).catch(function(err) { alert('Ошибка DOCX: ' + err.message); });
-      } else {
-        alert('Библиотека mammoth не загружена.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  } else if (ext === 'pdf') {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      if (typeof pdfjsLib !== 'undefined') {
-        var typedarray = new Uint8Array(e.target.result);
-        pdfjsLib.getDocument({ data: typedarray }).promise.then(function(pdf) {
-          var text = '';
-          var promises = [];
-          for (var i = 1; i <= pdf.numPages; i++) {
-            promises.push(pdf.getPage(i).then(function(page) {
-              return page.getTextContent().then(function(content) {
-                text += content.items.map(function(item) { return item.str; }).join(' ') + '\n';
-              });
-            }));
-          }
-          Promise.all(promises).then(function() { sourceText.value = text; });
-        }).catch(function(err) { alert('Ошибка PDF: ' + err.message); });
-      } else {
-        alert('Библиотека PDF.js не загружена.');
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    alert('Неподдерживаемый формат: ' + ext + '. Используйте .txt, .docx или .pdf.');
+  function doRestore(text, map) {
+    var result = text;
+    var keys = Object.keys(map).sort(function(a,b){ return b.length - a.length; });
+    for (var i = 0; i < keys.length; i++) {
+      var key = keys[i];
+      result = result.split(key).join(map[key]);
+    }
+    resultDiv.innerHTML = '<div style="margin-bottom:8px"><b>Odtworzony tekst:</b></div><textarea style="width:100%;min-height:200px">' + escapeHtml(result) + '</textarea>';
   }
-}
 
-// ========== ОБРАБОТЧИКИ СОБЫТИЙ ==========
-dropzone.addEventListener('dragover', function(e) { e.preventDefault(); dropzone.classList.add('dragover'); });
-dropzone.addEventListener('dragleave', function() { dropzone.classList.remove('dragover'); });
+  reader1.readAsText(fileInput.files[0]);
+  reader2.readAsText(mapInput.files[0]);
+};
+
+window.insertTestText = function() {
+  sourceText.value = 'ИП Малютину С.И., проживающему по адресу: г. Москва, ул. Ленина, д. 5, кв. 10. ' +
+    'Паспорт 45 06 123456, выдан 15.03.2010. Телефон: +7 (916) 123-45-67. ' +
+    'Email: ivanov@example.com. ИНН 7701234567. Сумма долга: 150 000.00 руб. ' +
+    'Ответчик: гражданин Петров Петр Петрович, 01.01.1985 г.р., зарегистрирован по адресу: г. Санкт-Петербург, пр. Невский, д. 100.';
+};
+
+window.clearAll = function() {
+  sourceText.value = '';
+  resultSection.classList.add('hidden');
+  replacementMap = {};
+  resultText = '';
+  allFoundMatches = [];
+  lastGrammarResult = null;
+};
+
+// ========== OBRABOTKA FAJLOW ==========
+fileInput.addEventListener('change', function(e) {
+  handleFile(e.target.files[0]);
+});
+
+dropzone.addEventListener('dragover', function(e) {
+  e.preventDefault();
+  dropzone.classList.add('dragover');
+});
+
+dropzone.addEventListener('dragleave', function() {
+  dropzone.classList.remove('dragover');
+});
+
 dropzone.addEventListener('drop', function(e) {
   e.preventDefault();
   dropzone.classList.remove('dragover');
-  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
-});
-fileInput.addEventListener('change', function(e) {
-  if (e.target.files[0]) handleFile(e.target.files[0]);
+  var files = e.dataTransfer.files;
+  if (files.length > 0) handleFile(files[0]);
 });
 
-// Обработчики чекбоксов типов
-document.querySelectorAll('#typeChips .chip').forEach(function(chip) {
-  var cb = chip.querySelector('input');
-  cb.addEventListener('change', function() { if (cb.checked) chip.classList.add('checked'); else chip.classList.remove('checked'); });
-});
-
-// ========== ОБРАБОТЧИКИ ТЕМ ==========
-(function(){
-  var themeBtns = document.querySelectorAll('.theme-btn');
-  for (var ti = 0; ti < themeBtns.length; ti++) {
-    themeBtns[ti].addEventListener('click', function() {
-      var theme = this.dataset.theme;
-      var html = document.documentElement;
-      html.classList.remove('theme-dark', 'theme-light');
-      for (var tj = 0; tj < themeBtns.length; tj++) themeBtns[tj].classList.remove('active');
-      this.classList.add('active');
-      if (theme === 'dark') html.classList.add('theme-dark');
-      else if (theme === 'light') html.classList.add('theme-light');
-    });
+function handleFile(file) {
+  if (!file) return;
+  var name = file.name.toLowerCase();
+  var dot = file.name.lastIndexOf('.');
+  loadedBaseName = dot > 0 ? file.name.slice(0, dot) : file.name;
+  loadedExt = dot > -1 ? name.slice(dot) : '';
+  if (name.endsWith('.txt') || name.endsWith('.md')) {
+    var reader = new FileReader();
+    reader.onload = function(e) { sourceText.value = e.target.result; };
+    reader.readAsText(file);
+  } else if (name.endsWith('.docx')) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      mammoth.convertToHtml({arrayBuffer: e.target.result})
+        .then(function(result) {
+          // сохраняем структуру: переносы строк, абзацы, ячейки и строки таблиц
+          var html = result.value;
+          var text = html
+            .replace(/<br\s*\/?>/gi, '\n')
+            .replace(/<\/tr>/gi, '\n')
+            .replace(/<\/td>/gi, '\t')
+            .replace(/<\/p>/gi, '\n')
+            .replace(/<\/h[1-6]>/gi, '\n')
+            .replace(/<[^>]+>/g, '');
+          var txt = document.createElement('textarea');
+          txt.innerHTML = text;
+          sourceText.value = txt.value.replace(/\n{3,}/g, '\n\n').trim();
+        })
+        .catch(function(err) { alert('Ошибка чтения DOCX: ' + err.message); });
+    };
+    reader.readAsArrayBuffer(file);
+  } else if (name.endsWith('.pdf')) {
+    if (typeof pdfjsLib === 'undefined') {
+      alert('Библиотека PDF не загрузилась (нет интернета?). Подключитесь к сети и обновите страницу.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var typedarray = new Uint8Array(e.target.result);
+      pdfjsLib.getDocument({
+        data: typedarray,
+        cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/cmaps/',
+        cMapPacked: true,
+        standardFontDataUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/standard_fonts/'
+      }).promise.then(function(pdf) {
+        var promises = [];
+        for (var i = 1; i <= pdf.numPages; i++) {
+          promises.push(pdf.getPage(i).then(function(page) {
+            return page.getTextContent().then(function(content) {
+              var out = '';
+              content.items.forEach(function(item) {
+                out += item.str + (item.hasEOL ? '\n' : ' ');
+              });
+              return out;
+            });
+          }));
+        }
+        Promise.all(promises).then(function(pages) {
+          var txt = pages.join('\n\n').replace(/\n{3,}/g, '\n\n').trim();
+          if (!txt) {
+            alert('PDF открыт, но текст не извлечён — возможно, это скан (картинки). Вставьте текст вручную.');
+          }
+          sourceText.value = txt;
+        });
+      }).catch(function(err) { alert('Ошибка чтения PDF: ' + err.message); });
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    alert('Неподдерживаемый формат. Используйте .txt, .md, .docx, .pdf');
   }
-})();
+}
 
-// ========== ИНИЦИАЛИЗАЦИЯ ==========
-document.getElementById('sensitivity').value = 2;
-document.getElementById('sensVal').textContent = 'Средняя';
-document.getElementById('fioStrictness').value = 50;
-document.getElementById('fioStrictVal').textContent = '50';
-document.getElementById('strictOnly').checked = false;
+// ========== CZIPSY ==========
+document.querySelectorAll('#typeChips .chip').forEach(function(chip) {
+  chip.addEventListener('click', function(e) {
+    if (e.target.tagName === 'INPUT') return;
+    var cb = chip.querySelector('input');
+    cb.checked = !cb.checked;
+    chip.classList.toggle('checked', cb.checked);
+  });
+  var cb = chip.querySelector('input');
+  cb.addEventListener('change', function() {
+    chip.classList.toggle('checked', cb.checked);
+  });
+});
 
-console.log('Анонимизатор Pro v5.0 загружен');
+// ========== TEMA ==========
+document.querySelectorAll('.theme-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var theme = btn.getAttribute('data-theme');
+    document.querySelectorAll('.theme-btn').forEach(function(b) { b.classList.remove('active'); });
+    btn.classList.add('active');
+    document.documentElement.classList.remove('theme-light', 'theme-dark');
+    if (theme === 'light') document.documentElement.classList.add('theme-light');
+    else if (theme === 'dark') document.documentElement.classList.add('theme-dark');
+  });
+});
 
-// ========== ЗАКРЫТИЕ IIFE ==========
+// ========== PREDUPREZHDENIE ==========
+var warnBox = document.getElementById('warnBox');
+if (warnBox) {
+  var warnings = [];
+  if (!morphEngineAvailable) warnings.push('MorphEngine nie zaladowany — morfologiczny analiz niedostepny.');
+  if (!grammarAnalyzerAvailable) warnings.push('GrammarAnalyzer nie zaladowany — gramatyczny analiz niedostepny.');
+  if (warnings.length > 0) {
+    warnBox.textContent = warnings.join(' ');
+    warnBox.classList.add('show');
+  }
+}
+
 })();
 </script>
 </body>
