@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERKO Anonymize Pro v9 — Анонимизация юридических документов РФ и РБ</title>
+<meta name="description" content="Профессиональная анонимизация персональных данных в юридических документах России и Беларуси. Морфология, контрольные суммы, псевдонимы. Всё работает локально в браузере.">
+<link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><path fill='%234f7cff' d='M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'/></svg>">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if (window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
+<script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <div class="header-left">
+      <div class="logo">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      </div>
+      <div>
+        <h1>SERKO Anonymize <span class="pro">Pro</span> <span class="badge">v9.0</span></h1>
+        <p class="subtitle">Анонимизация юридических документов · Россия и Беларусь · Морфология + контрольные суммы + псевдонимы</p>
+      </div>
+    </div>
+    <div class="theme-switcher">
+      <button class="theme-btn" data-theme="system" title="Системная тема">🌓</button>
+      <button class="theme-btn" data-theme="light" title="Светлая тема">☀️</button>
+      <button class="theme-btn" data-theme="dark" title="Тёмная тема">🌙</button>
+    </div>
+  </header>
+
+  <div class="privacy-note">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+    100% локально: все вычисления выполняются в вашем браузере. Документы никуда не отправляются.
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Исходный документ
+      </div>
+      <div class="dropzone" id="dropzone">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <div>Перетащите файл (.txt, .md, .docx, .pdf) или нажмите для выбора</div>
+        <div class="small" id="fileStatus">Файл не выбран</div>
+      </div>
+      <input type="file" id="fileInput" accept=".txt,.md,.docx,.pdf" style="display:none">
+      <textarea id="sourceText" placeholder="Вставьте текст документа сюда…" style="margin-top:12px"></textarea>
+      <div class="toolbar">
+        <button class="btn btn-secondary" id="btnTest">📝 Тестовый текст</button>
+        <button class="btn btn-secondary" id="btnClear">🗑 Очистить</button>
+        <span class="small" id="charCount" style="margin-left:auto"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82.33l.06.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Режим работы
+      </div>
+      <div class="toggle-group">
+        <button class="toggle-btn active" data-mode="mask">Маскирование</button>
+        <button class="toggle-btn" data-mode="pseudonym">Псевдонимы</button>
+        <button class="toggle-btn" data-mode="reversible">С восстановлением</button>
+      </div>
+      <div class="small mode-hint" id="modeHint">Заменяет данные на плейсхолдеры [ФИО-1], [ИНН] и т.д.</div>
+
+      <div class="stopwords-area">
+        <label class="small" style="font-weight:600">Стоп-слова (не маскировать):</label>
+        <textarea id="stopWordsInput" placeholder="Слова через запятую, которые не должны заменяться&#10;например: предоставлении, разъяснении, больница"></textarea>
+      </div>
+
+      <div class="stopwords-area">
+        <label class="small" style="font-weight:600">Пользовательские слова (всегда маскировать):</label>
+        <input type="text" id="customNames" placeholder="Иванов, Петровна, Минск, Ленина, …">
+        <div class="small">Фамилии, имена, отчества, города, улицы — через запятую. Склоняются автоматически.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      Что скрывать
+      <span class="chip-actions">
+        <button class="link-btn" id="chipsAll">всё</button>
+        <button class="link-btn" id="chipsNone">ничего</button>
+        <button class="link-btn" id="chipsDefault">по умолчанию</button>
+      </span>
+    </div>
+    <div class="chips-grid" id="typeChips">
+      <div class="chip-group">
+        <div class="chip-group-title">Персона</div>
+        <label class="chip checked" data-type="fio"><input type="checkbox" checked>ФИО</label>
+        <label class="chip checked" data-type="dob"><input type="checkbox" checked>Даты рождения</label>
+        <label class="chip checked" data-type="address"><input type="checkbox" checked>Адреса</label>
+        <label class="chip checked" data-type="phone"><input type="checkbox" checked>Телефоны</label>
+        <label class="chip checked" data-type="email"><input type="checkbox" checked>Email</label>
+      </div>
+      <div class="chip-group">
+        <div class="chip-group-title">Документы</div>
+        <label class="chip checked" data-type="passport_ru"><input type="checkbox" checked>Паспорт РФ</label>
+        <label class="chip checked" data-type="passport_by"><input type="checkbox" checked>Паспорт РБ</label>
+        <label class="chip checked" data-type="personal_id_by"><input type="checkbox" checked>Личный номер РБ</label>
+        <label class="chip checked" data-type="doc"><input type="checkbox" checked>ВУ / СТС / ПТС</label>
+        <label class="chip checked" data-type="polis"><input type="checkbox" checked>Полисы (ОСАГО/КАСКО)</label>
+      </div>
+      <div class="chip-group">
+        <div class="chip-group-title">Финансы и реквизиты</div>
+        <label class="chip checked" data-type="inn"><input type="checkbox" checked>ИНН</label>
+        <label class="chip checked" data-type="snils"><input type="checkbox" checked>СНИЛС</label>
+        <label class="chip checked" data-type="ogrn"><input type="checkbox" checked>ОГРН / КПП</label>
+        <label class="chip checked" data-type="unp"><input type="checkbox" checked>УНП (РБ)</label>
+        <label class="chip checked" data-type="bank_account"><input type="checkbox" checked>Счета / БИК</label>
+        <label class="chip checked" data-type="iban"><input type="checkbox" checked>IBAN</label>
+        <label class="chip checked" data-type="card"><input type="checkbox" checked>Банковские карты</label>
+      </div>
+      <div class="chip-group">
+        <div class="chip-group-title">Прочее</div>
+        <label class="chip" data-type="company"><input type="checkbox">Юр. лица</label>
+        <label class="chip" data-type="money"><input type="checkbox">Суммы</label>
+        <label class="chip" data-type="vehicle"><input type="checkbox">Гос. номера авто</label>
+        <label class="chip checked" data-type="ip"><input type="checkbox" checked>IP / URL / MAC</label>
+      </div>
+    </div>
+    <div class="small" style="margin-top:10px">💡 «Юр. лица» и «Суммы» по умолчанию выключены: в исках и договорах они обычно должны остаться. Номера дел, статей и договоров не маскируются никогда.</div>
+  </div>
+
+  <div class="section text-center">
+    <button class="btn btn-primary btn-big" id="btnAnonymize">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+      Анонимизировать
+    </button>
+    <div class="progress hidden" id="progressWrap"><div class="progress-bar" id="progressBar"></div></div>
+  </div>
+
+  <div class="section hidden" id="resultSection">
+    <div class="card">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        Результат
+      </div>
+      <div class="warn-box hidden" id="warnBox"></div>
+      <div class="stats" id="stats"></div>
+
+      <div class="tab-bar">
+        <div class="tab active" data-tab="preview">Предпросмотр</div>
+        <div class="tab" data-tab="matches">Совпадения <span class="count-badge" id="matchCountBadge"></span></div>
+        <div class="tab" data-tab="text">Чистый текст</div>
+      </div>
+
+      <div class="tab-content active" id="content-preview">
+        <div class="editor-bar">
+          <span class="small">Клик по подсвеченному фрагменту — скрыть/оставить. Выделите текст и нажмите «Скрыть выделенное» для точных границ.</span>
+          <span class="anm-mode on" id="anmModeHide" title="Клик скрывает фрагмент">🙈 Скрывать</span>
+          <span class="anm-mode" id="anmModeKeep" title="Клик оставляет оригинал">✓ Оставлять</span>
+          <button class="btn btn-secondary btn-sm" id="anmHideSel" disabled>🙈 Скрыть выделенное</button>
+          <button class="btn btn-secondary btn-sm" id="anmUndo" disabled>↶ Отменить</button>
+          <button class="btn btn-secondary btn-sm" id="anmReset" disabled>Сбросить правки</button>
+        </div>
+        <div class="preview" id="preview"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="tab-content" id="content-matches">
+        <div class="match-list" id="matchList"></div>
+      </div>
+
+      <div class="tab-content" id="content-text">
+        <textarea id="cleanText" style="min-height:320px;margin-top:0"></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="btnCopy">📋 Копировать</button>
+        <button class="btn btn-secondary" id="btnDownloadTxt">⬇ Скачать .txt</button>
+        <button class="btn btn-secondary" id="btnDownloadDocx">⬇ Скачать .docx</button>
+        <button class="btn btn-secondary hidden" id="btnDownloadMap">🔑 Карта восстановления</button>
+      </div>
+    </div>
+
+    <div class="card" id="restoreCard">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        Восстановление документа
+      </div>
+      <div class="small" style="margin-bottom:8px">Загрузите анонимизированный текст и карту восстановления (.json), чтобы вернуть оригинальные данные.</div>
+      <div class="restore-grid">
+        <div>
+          <label class="small" style="font-weight:600">Анонимизированный текст:</label>
+          <textarea id="restoreText" placeholder="Вставьте анонимизированный текст…" style="min-height:120px"></textarea>
+        </div>
+        <div>
+          <label class="small" style="font-weight:600">Карта восстановления (.json):</label>
+          <input type="file" id="restoreMapFile" accept=".json" class="file-line">
+          <button class="btn btn-secondary" id="btnRestore" style="margin-top:10px">↩ Восстановить</button>
+        </div>
+      </div>
+      <div class="hidden" id="restoreResultWrap">
+        <label class="small" style="font-weight:600;margin-top:12px;display:block">Восстановленный текст:</label>
+        <textarea id="restoreResult" style="min-height:140px"></textarea>
+        <div class="actions">
+          <button class="btn btn-secondary" id="btnRestoreDownload">⬇ Скачать .txt</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div>SERKO Anonymize Pro v9.0 · Морфологический движок v2 · Контрольные суммы: ИНН, СНИЛС, ОГРН, УНП, р/с+БИК, карты (Лун), IBAN (mod-97)</div>
+    <div class="small">© <span id="year"></span> Серко И.И. Все права защищены. Коммерческая лицензия.</div>
+  </footer>
+</div>
+
+<script src="js/dictionaries.js"></script>
+<script src="js/morph-engine.js"></script>
+<script src="js/validators.js"></script>
+<script src="js/detectors.js"></script>
+<script src="js/fio-engine.js"></script>
+<script src="js/anonymizer.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
